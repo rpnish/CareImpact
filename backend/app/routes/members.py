@@ -10,6 +10,7 @@ from app.models import (
     MemberUpdateInput
 )
 from app.gap_engine import evaluate_member_measures
+from app.priority_engine import calculate_dynamic_priority
 
 router = APIRouter(prefix="/members", tags=["Members"])
 
@@ -58,17 +59,17 @@ async def list_members(
 ):
     """
     List members with optional filtering by status (pending/completed),
-    specific measure gap, or text search.
+    specific measure gap, or text search, with dynamic priority ranking.
     """
     db = get_db()
     members_coll = db["members"]
     
     query: Dict[str, Any] = {}
     
-    if status:
+    if status and isinstance(status, str):
         query["overallStatus"] = status.strip().lower()
         
-    if measure:
+    if measure and isinstance(measure, str):
         measure_key = measure.strip().lower()
         # Look for gap in the specified measure
         query[f"measures.{measure_key}.status"] = "gap"
@@ -78,8 +79,13 @@ async def list_members(
     
     flat_members = [doc_to_flat(m) for m in raw_members]
     
+    # Calculate dynamic priority scores using Dynamic CMS Priority Engine
+    if flat_members:
+        p_res = calculate_dynamic_priority(flat_members)
+        flat_members = p_res.get("member_ranking", flat_members)
+    
     # Filter by search string if provided
-    if search:
+    if search and isinstance(search, str):
         s = search.strip().lower()
         flat_members = [
             m for m in flat_members

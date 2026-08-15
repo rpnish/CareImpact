@@ -318,3 +318,20 @@ async def get_analytics_geo():
         
     geo_points.sort(key=lambda x: x.total_members, reverse=True)
     return geo_points
+
+@router.get("/priority", response_model=Dict[str, Any])
+async def get_dynamic_priority():
+    """
+    Returns Dynamic CMS Star + Measure-First Priority Engine output:
+    - priority_measure (The #1 target measure to close)
+    - measure_ranking (Ranked list of measures by opportunity ROI)
+    - member_ranking (Members ranked by target gap, reachability, and total gaps)
+    """
+    from app.routes.members import list_members
+    from app.priority_engine import calculate_dynamic_priority
+    
+    # Get all active members flat
+    members = await list_members(status=None, measure=None, search=None)
+    priority_output = calculate_dynamic_priority(members)
+    return priority_output
+

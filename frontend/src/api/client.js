@@ -61,8 +61,9 @@ export const api = {
 
   // Analytics
   getAnalyticsSummary: () => request('/analytics/summary'),
-  getAnalyticsTrend: () => request('/analytics/trend'),
-  getAnalyticsGeo: () => request('/analytics/geo'),
+  getTrend: () => request('/analytics/trend'),
+  getGeoData: () => request('/analytics/geo'),
+  getPriority: () => request('/analytics/priority'),
 
   // Admin & Sync
   resyncData: () => request('/admin/resync', { method: 'POST' }),

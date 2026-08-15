@@ -93,7 +93,7 @@ async def test_full_api_workflow():
         assert summary["total_members"] >= len(members)
         assert len(summary["measures"]) == 4
 
-        # 9. Analytics geo & trend
+        # 9. Analytics geo, trend, & dynamic priority
         res_geo = await client.get("/analytics/geo")
         assert res_geo.status_code == 200
         assert len(res_geo.json()) > 0
@@ -101,6 +101,12 @@ async def test_full_api_workflow():
         res_trend = await client.get("/analytics/trend")
         assert res_trend.status_code == 200
         assert len(res_trend.json()) > 0
+
+        res_priority = await client.get("/analytics/priority")
+        assert res_priority.status_code == 200
+        priority_data = res_priority.json()
+        assert "measure_ranking" in priority_data
+        assert "member_ranking" in priority_data
 
         # 10. Delete member
         res_del = await client.delete(f"/members/{created_id}")
