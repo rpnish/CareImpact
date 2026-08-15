@@ -59,6 +59,25 @@ export const api = {
       method: 'DELETE',
     }),
 
+  // Proof Documents Upload & Management
+  uploadProofDocument: async (memberId, formData) => {
+    const url = `${API_BASE_URL}/members/${encodeURIComponent(memberId)}/proof-documents`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.detail || 'Failed to upload proof document');
+    }
+    return await response.json();
+  },
+
+  deleteProofDocument: (memberId, docId) =>
+    request(`/members/${encodeURIComponent(memberId)}/proof-documents/${encodeURIComponent(docId)}`, {
+      method: 'DELETE',
+    }),
+
   // Analytics
   getAnalyticsSummary: () => request('/analytics/summary'),
   getTrend: () => request('/analytics/trend'),

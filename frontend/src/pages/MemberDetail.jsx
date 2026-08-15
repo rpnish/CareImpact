@@ -19,6 +19,9 @@ import {
   AlertCircle,
   FileText,
   Info,
+  Paperclip,
+  Upload,
+  ExternalLink,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
@@ -332,6 +335,81 @@ export default function MemberDetail() {
             );
           })}
         </div>
+      </div>
+
+      {/* 5. Clinical Proof & Hospital Documents Section */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Paperclip className="w-4 h-4 text-teal-light" />
+            <h2 className="text-base font-bold text-white tracking-tight">Clinical Proof & Hospital Documents</h2>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-teal/15 text-teal-light border border-teal/30">
+              {(member.proof_documents || rawDoc.proof_documents || []).length} Verified
+            </span>
+          </div>
+          <button
+            onClick={() => setIsEditOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload New Proof</span>
+          </button>
+        </div>
+
+        {(member.proof_documents || rawDoc.proof_documents || []).length === 0 ? (
+          <div className="glass-card rounded-2xl p-6 border border-slate-800 text-center space-y-2">
+            <FileText className="w-8 h-8 text-slate-600 mx-auto" />
+            <p className="text-xs font-medium text-slate-300">No hospital proof documents attached yet</p>
+            <p className="text-[11px] text-slate-500">
+              Upload signed physician notes, lab results, retinal scan PDFs, or vaccine cards to verify closed gaps.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(member.proof_documents || rawDoc.proof_documents || []).map((doc) => (
+              <div
+                key={doc.id}
+                className="glass-card rounded-2xl p-4 border border-slate-800 hover:border-teal/40 transition-all space-y-2 group"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="p-2 rounded-xl bg-teal/15 text-teal-light border border-teal/30 shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="truncate">
+                      <h4 className="text-xs font-bold text-white truncate" title={doc.original_filename || doc.filename}>
+                        {doc.original_filename || doc.filename}
+                      </h4>
+                      <span className="text-[10px] text-teal-light uppercase tracking-wider font-semibold block">
+                        {doc.measure_key?.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={`http://127.0.0.1:8000${doc.file_url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-teal-light hover:bg-slate-800 transition-colors shrink-0"
+                    title="Open Document"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+
+                {doc.notes && (
+                  <p className="text-[11px] text-slate-300 italic bg-navy-950/60 p-2 rounded-lg border border-slate-850">
+                    "{doc.notes}"
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
+                  <span>Size: {Math.round((doc.size_bytes || 0) / 1024)} KB</span>
+                  <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Edit Member Modal */}

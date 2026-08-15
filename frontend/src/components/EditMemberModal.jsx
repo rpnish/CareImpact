@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Edit3, HeartPulse, Eye, Pill, Syringe, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Edit3, HeartPulse, Eye, Pill, Syringe, Sparkles, Upload, FileText, CheckCircle2, Trash2, Paperclip, ExternalLink } from 'lucide-react';
 import { api } from '../api/client';
 import { useToast } from './Toast';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdated }) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -21,6 +24,12 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
     adherence_pct: '',
     last_flu_shot_date: '',
   });
+
+  // Proof document state
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [proofMeasure, setProofMeasure] = useState('flu_vaccination');
+  const [proofNotes, setProofNotes] = useState('');
+  const [proofDocuments, setProofDocuments] = useState([]);
 
   useEffect(() => {
     if (member) {
@@ -37,6 +46,7 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
         adherence_pct: member.adherence_pct ?? '',
         last_flu_shot_date: member.last_flu_shot_date || '',
       });
+      setProofDocuments(member.proof_documents || member.raw_doc?.proof_documents || []);
     }
   }, [member]);
 
@@ -44,6 +54,47 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUploadProof = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      toast.error('Please select a file to upload (PDF, PNG, JPG)');
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const data = new FormData();
+      data.append('file', selectedFile);
+      data.append('measure_key', proofMeasure);
+      if (proofNotes.trim()) {
+        data.append('notes', proofNotes.trim());
+      }
+
+      const res = await api.uploadProofDocument(member.member_id, data);
+      toast.success(`Proof document '${selectedFile.name}' uploaded successfully!`);
+      setSelectedFile(null);
+      setProofNotes('');
+      setProofDocuments((prev) => [...prev, res.document]);
+      if (res.member) {
+        onMemberUpdated(res.member);
+      }
+    } catch (err) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteProof = async (docId, fileName) => {
+    try {
+      await api.deleteProofDocument(member.member_id, docId);
+      setProofDocuments((prev) => prev.filter((d) => d.id !== docId));
+      toast.success(`Proof '${fileName}' removed.`);
+    } catch (err) {
+      toast.error(`Failed to delete proof: ${err.message}`);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -91,7 +142,7 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                 <Edit3 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Edit Clinical Member Records</h3>
+                <h3 className="text-base font-semibold text-white">Edit Clinical Member & Hospital Proof</h3>
                 <p className="text-xs text-slate-400 font-mono">Member ID: {member.member_id}</p>
               </div>
             </div>
@@ -104,7 +155,7 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
             {/* Demographics */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Demographics</h4>
@@ -116,7 +167,7 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     required
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500/50"
                   />
                 </div>
                 <div>
@@ -125,54 +176,20 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     type="number"
                     value={formData.age}
                     onChange={(e) => handleChange('age', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Gender</label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => handleChange('gender', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  >
-                    <option value="M">Male (M)</option>
-                    <option value="F">Female (F)</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">City</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">State</label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => handleChange('state', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500/50"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Conditions */}
+            {/* Condition Flags */}
             <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Conditions</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Diagnosed Conditions</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                   formData.has_diabetes
                     ? 'bg-sky-500/10 border-sky-500/40 text-white'
-                    : 'bg-navy-950/60 border-slate-800 text-slate-400'
+                    : 'bg-navy-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
                 }`}>
                   <input
                     type="checkbox"
@@ -180,13 +197,16 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     onChange={(e) => handleChange('has_diabetes', e.target.checked)}
                     className="w-4 h-4 rounded text-teal focus:ring-0 cursor-pointer"
                   />
-                  <span className="text-xs font-semibold">Type 2 Diabetes</span>
+                  <div>
+                    <span className="text-xs font-semibold block">Type 2 Diabetes</span>
+                    <span className="text-[10px] text-slate-400">Activates Eye Exam & Med Adherence</span>
+                  </div>
                 </label>
 
                 <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                   formData.has_hypertension
                     ? 'bg-sky-500/10 border-sky-500/40 text-white'
-                    : 'bg-navy-950/60 border-slate-800 text-slate-400'
+                    : 'bg-navy-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
                 }`}>
                   <input
                     type="checkbox"
@@ -194,20 +214,23 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     onChange={(e) => handleChange('has_hypertension', e.target.checked)}
                     className="w-4 h-4 rounded text-teal focus:ring-0 cursor-pointer"
                   />
-                  <span className="text-xs font-semibold">Essential Hypertension</span>
+                  <div>
+                    <span className="text-xs font-semibold block">Essential Hypertension</span>
+                    <span className="text-[10px] text-slate-400">Activates Blood Pressure Control</span>
+                  </div>
                 </label>
               </div>
             </div>
 
-            {/* Clinical measure fields */}
+            {/* Clinical Value Inputs */}
             <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Clinical Measure Entries</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Clinical Measurements & Dates (Live Re-Evaluation)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Eye Exam */}
                 <div className={!formData.has_diabetes ? 'opacity-40 pointer-events-none' : ''}>
                   <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
                     <Eye className="w-3.5 h-3.5 text-teal-light" />
-                    Last Eye Exam Date
+                    Last Diabetic Eye Exam Date
                   </label>
                   <input
                     type="date"
@@ -215,39 +238,42 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     onChange={(e) => handleChange('last_exam_date', e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Compliant if ≥ 2024-08-14 (last 24 months)</p>
                 </div>
 
                 {/* Blood Pressure */}
                 <div className={!formData.has_hypertension ? 'opacity-40 pointer-events-none' : ''}>
                   <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
                     <HeartPulse className="w-3.5 h-3.5 text-rose-light" />
-                    Last BP Reading
+                    Last BP Reading (Sys/Dia)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 118/76"
+                    placeholder="e.g. 120/80"
                     value={formData.last_bp_reading}
                     onChange={(e) => handleChange('last_bp_reading', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose/50"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Compliant if &lt;140/90 mmHg</p>
                 </div>
 
-                {/* Med Adherence */}
+                {/* Adherence % */}
                 <div className={!formData.has_diabetes ? 'opacity-40 pointer-events-none' : ''}>
                   <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
                     <Pill className="w-3.5 h-3.5 text-sky-400" />
-                    Med Adherence % (PDC)
+                    Diabetes Med Adherence (PDC %)
                   </label>
                   <input
                     type="number"
                     step="0.1"
                     min="0"
                     max="100"
-                    placeholder="e.g. 95.0"
+                    placeholder="e.g. 85.0"
                     value={formData.adherence_pct}
                     onChange={(e) => handleChange('adherence_pct', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Compliant if PDC ≥ 80%</p>
                 </div>
 
                 {/* Flu Shot */}
@@ -260,13 +286,115 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
                     type="date"
                     value={formData.last_flu_shot_date}
                     onChange={(e) => handleChange('last_flu_shot_date', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber/50"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Compliant if on/after 2024-07-01</p>
                 </div>
               </div>
             </div>
 
-            {/* Footer buttons */}
+            {/* Upload Hospital Proof Documents Section */}
+            <div className="space-y-3 pt-3 border-t border-slate-800 bg-navy-950/60 p-4 rounded-2xl border border-slate-800">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-teal-light flex items-center gap-1.5">
+                  <Paperclip className="w-4 h-4" />
+                  Attach Hospital Proof Documents
+                </h4>
+                <span className="text-[10px] text-slate-400">PDF, PNG, JPG, or DOC</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Target Care Measure</label>
+                  <select
+                    value={proofMeasure}
+                    onChange={(e) => setProofMeasure(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-navy-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal/50"
+                  >
+                    <option value="flu_vaccination">Annual Flu Vaccine</option>
+                    <option value="blood_pressure_control">Blood Pressure Control</option>
+                    <option value="diabetic_eye_exam">Diabetic Eye Exam</option>
+                    <option value="diabetes_med_adherence">Diabetes Med Adherence</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] text-slate-400 mb-1">Hospital / Clinic Notes</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mass General eye clinic report signed by Dr. Smith"
+                    value={proofNotes}
+                    onChange={(e) => setProofNotes(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-navy-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal/50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="file"
+                  id="proof-file-input"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadProof}
+                  disabled={uploadingDoc || !selectedFile}
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal/20 text-teal-light hover:bg-teal/30 border border-teal/40 transition-all disabled:opacity-40"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {uploadingDoc ? 'Uploading...' : 'Upload Proof'}
+                </button>
+              </div>
+
+              {/* List of currently attached documents */}
+              {proofDocuments.length > 0 && (
+                <div className="space-y-1.5 pt-2">
+                  <span className="text-[11px] font-semibold text-slate-400 block">Attached Documents ({proofDocuments.length}):</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {proofDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-2 rounded-xl bg-navy-900 border border-slate-800 text-xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="w-4 h-4 text-teal-light shrink-0" />
+                          <div className="truncate">
+                            <span className="font-semibold text-slate-200 truncate block text-[11px]">
+                              {doc.original_filename || doc.filename}
+                            </span>
+                            <span className="text-[10px] text-slate-500 block">
+                              {doc.measure_key} · {Math.round((doc.size_bytes || 0) / 1024)} KB
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <a
+                            href={`${API_BASE_URL}${doc.file_url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 text-slate-400 hover:text-teal-light"
+                            title="View Document"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProof(doc.id, doc.original_filename || doc.filename)}
+                            className="p-1 text-slate-500 hover:text-rose-light"
+                            title="Remove Proof"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
@@ -278,9 +406,9 @@ export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdat
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-navy-950 transition-all shadow-glow-sky disabled:opacity-50"
               >
-                {loading ? 'Saving...' : 'Save & Re-Evaluate'}
+                {loading ? 'Saving & Re-Evaluating...' : 'Save & Re-Evaluate Member'}
               </button>
             </div>
           </form>

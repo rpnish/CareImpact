@@ -23,6 +23,17 @@ class MemberInsurance(BaseModel):
     company: str = "Medicare"
     planType: str = "Medicare Advantage"
 
+class ProofDocument(BaseModel):
+    id: str
+    measure_key: str
+    filename: str
+    original_filename: str
+    file_url: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: str
+    notes: Optional[str] = None
+
 class MemberConditions(BaseModel):
     diabetes: bool = False
     hypertension: bool = False
@@ -40,6 +51,7 @@ class MemberDocument(BaseModel):
     measures: MeasuresMap
     overallStatus: OverallStatus
     priorityScore: int = 0
+    proof_documents: List[ProofDocument] = Field(default_factory=list)
     updatedAt: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class MemberFlat(BaseModel):
@@ -62,6 +74,7 @@ class MemberFlat(BaseModel):
     last_flu_shot_date: Optional[str] = None
     overallStatus: OverallStatus
     priorityScore: int = 0
+    proof_documents: List[Dict[str, Any]] = Field(default_factory=list)
     updatedAt: Optional[str] = None
 
 class MemberCreateInput(BaseModel):

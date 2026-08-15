@@ -1,7 +1,9 @@
 import uuid
+import re
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile, Form
 from app.database import get_db
 from app.models import (
     MemberDocument,
@@ -46,6 +48,7 @@ def doc_to_flat(doc: dict) -> dict:
         "last_flu_shot_date": flu.get("value"),
         "overallStatus": doc.get("overallStatus", "completed"),
         "priorityScore": doc.get("priorityScore", 0),
+        "proof_documents": doc.get("proof_documents", []),
         "updatedAt": doc.get("updatedAt"),
         # Also include nested structures for detail view
         "raw_doc": doc
@@ -205,6 +208,8 @@ async def update_member(member_id: str, payload: MemberUpdateInput):
         "last_flu_shot_date": last_flu_shot_date
     })
     
+    existing_proofs = existing.get("proof_documents", [])
+    
     updated_doc = {
         "_id": member_id,
         "name": name,
@@ -221,12 +226,119 @@ async def update_member(member_id: str, payload: MemberUpdateInput):
         "conditions": eval_result["conditions"],
         "measures": eval_result["measures"],
         "overallStatus": eval_result["overallStatus"],
-        "priorityScore": 0,  # placeholder
+        "priorityScore": existing.get("priorityScore", 0),
+        "proof_documents": existing_proofs,
         "updatedAt": datetime.now(timezone.utc).isoformat()
     }
     
     await members_coll.update_one({"_id": member_id}, {"$set": updated_doc})
     return doc_to_flat(updated_doc)
+
+@router.post("/{member_id}/proof-documents", status_code=status.HTTP_201_CREATED)
+async def upload_proof_document(
+    member_id: str,
+    file: UploadFile = File(...),
+    measure_key: str = Form(...),
+    notes: Optional[str] = Form(None)
+):
+    """
+    Upload a hospital/clinic proof document (PDF, PNG, JPG, etc.) for a specific care gap closure.
+    Stores the document in local storage and records metadata in MongoDB Atlas.
+    """
+    db = get_db()
+    members_coll = db["members"]
+    
+    existing = await members_coll.find_one({"_id": member_id})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Member with ID '{member_id}' not found"
+        )
+
+    # Prepare upload directory
+    upload_dir = Path("uploads") / member_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    doc_id = str(uuid.uuid4())
+    safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", file.filename or "proof_doc")
+    saved_filename = f"{doc_id[:8]}_{safe_filename}"
+    file_path = upload_dir / saved_filename
+
+    # Save file contents
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+        
+    doc_metadata = {
+        "id": doc_id,
+        "measure_key": measure_key.strip(),
+        "filename": saved_filename,
+        "original_filename": file.filename or saved_filename,
+        "file_url": f"/uploads/{member_id}/{saved_filename}",
+        "content_type": file.content_type or "application/octet-stream",
+        "size_bytes": len(content),
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "notes": notes.strip() if notes else None
+    }
+    
+    # Append document to member in MongoDB
+    await members_coll.update_one(
+        {"_id": member_id},
+        {
+            "$push": {"proof_documents": doc_metadata},
+            "$set": {"updatedAt": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    updated_member = await members_coll.find_one({"_id": member_id})
+    return {
+        "message": "Proof document uploaded successfully",
+        "document": doc_metadata,
+        "member": doc_to_flat(updated_member)
+    }
+
+@router.delete("/{member_id}/proof-documents/{doc_id}")
+async def delete_proof_document(member_id: str, doc_id: str):
+    """
+    Delete a proof document from a member.
+    """
+    db = get_db()
+    members_coll = db["members"]
+    
+    existing = await members_coll.find_one({"_id": member_id})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Member with ID '{member_id}' not found"
+        )
+        
+    proofs = existing.get("proof_documents", [])
+    doc_to_delete = next((p for p in proofs if p.get("id") == doc_id), None)
+    
+    if not doc_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proof document with ID '{doc_id}' not found"
+        )
+        
+    # Remove file from disk if exists
+    try:
+        fpath = Path("uploads") / member_id / doc_to_delete.get("filename", "")
+        if fpath.exists():
+            fpath.unlink()
+    except Exception:
+        pass
+        
+    # Remove from MongoDB
+    await members_coll.update_one(
+        {"_id": member_id},
+        {
+            "$pull": {"proof_documents": {"id": doc_id}},
+            "$set": {"updatedAt": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    return {"message": "Proof document deleted successfully", "doc_id": doc_id}
 
 @router.delete("/{member_id}", status_code=status.HTTP_200_OK)
 async def delete_member(member_id: str):
