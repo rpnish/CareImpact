@@ -142,12 +142,46 @@ export default function MemberTable({
       );
     }
     if (key === 'priorityScore') {
-      return <span className="font-mono text-xs text-slate-400">{val ?? 0}</span>;
+      const p = row.priorityScore ?? 1;
+      if (p === 3) {
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+            3 (High)
+          </span>
+        );
+      }
+      if (p === 2) {
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            2 (Med)
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800/80 text-slate-400 border border-slate-700">
+          1 (Low)
+        </span>
+      );
     }
     if (val === null || val === undefined || val === '') {
       return <span className="text-slate-600">—</span>;
     }
     return <span className="text-xs text-slate-300">{String(val)}</span>;
+  };
+
+  const getRowBackgroundClass = (row, idx) => {
+    const p = row.priorityScore ?? 1;
+    if (p === 3) {
+      return 'bg-rose-950/30 hover:bg-rose-900/40 border-l-4 border-l-rose-500';
+    }
+    if (p === 2) {
+      return 'bg-amber-950/25 hover:bg-amber-900/35 border-l-4 border-l-amber-500';
+    }
+    return `border-l-4 border-l-transparent hover:bg-slate-800/40 ${
+      idx % 2 === 0 ? 'bg-transparent' : 'bg-navy-900/30'
+    }`;
   };
 
   return (
@@ -302,9 +336,7 @@ export default function MemberTable({
                 filteredMembers.map((row, idx) => (
                   <tr
                     key={row.member_id}
-                    className={`group hover:bg-slate-800/40 transition-colors ${
-                      idx % 2 === 0 ? 'bg-transparent' : 'bg-navy-900/30'
-                    }`}
+                    className={`group transition-all duration-150 ${getRowBackgroundClass(row, idx)}`}
                   >
                     {COLUMNS_CONFIG.map((col) => (
                       <td

@@ -195,6 +195,21 @@ export default function MemberDetail() {
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-extrabold text-white tracking-tight">{member.member_name}</h1>
                 <StatusBadge status={member.overallStatus} size="md" />
+                {member.priorityScore === 3 ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                    Priority 3 (High)
+                  </span>
+                ) : member.priorityScore === 2 ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    Priority 2 (Medium)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-400 border border-slate-700">
+                    Priority 1 (Low)
+                  </span>
+                )}
               </div>
               <p className="text-xs font-mono text-slate-400 mt-1">ID: {member.member_id}</p>
               <div className="flex items-center gap-3 mt-3 text-xs text-slate-300 flex-wrap">

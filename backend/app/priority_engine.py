@@ -322,26 +322,29 @@ def rank_members_for_target(
         ]
         total_gaps = sum(1 for s in statuses if s == "gap")
 
-        # Priority calculation
+        # Priority rank calculation:
+        # 3 (High Priority): Member has open gap in the #1 Target Measure (e.g. Flu / BP)
+        # 2 (Medium Priority): Member has other open care gaps
+        # 1 (Low Priority): Member has 0 open care gaps (Completed)
         if is_target_gap:
-            score = 60 + reachability + (total_gaps * 5)
+            priority_rank = 3
         elif total_gaps > 0:
-            score = 20 + reachability + (total_gaps * 5)
+            priority_rank = 2
         else:
-            score = 0
+            priority_rank = 1
 
         m_copy = dict(m)
         m_copy["target_measure_gap"] = is_target_gap
         m_copy["reachability_score"] = reachability
         m_copy["days_since_encounter"] = days
         m_copy["total_gaps"] = total_gaps
-        m_copy["priorityScore"] = score
+        m_copy["priorityScore"] = priority_rank
         ranked.append(m_copy)
 
-    # Sort descending by priorityScore, then total_gaps
+    # Sort descending by priorityScore (3 -> 2 -> 1), then reachability_score, then total_gaps
     ranked.sort(
         key=lambda x: (
-            1 if x["target_measure_gap"] else 0,
+            x["priorityScore"],
             x["reachability_score"],
             x["total_gaps"]
         ),
