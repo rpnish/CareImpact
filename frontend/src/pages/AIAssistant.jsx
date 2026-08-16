@@ -77,9 +77,16 @@ export default function AIAssistant() {
     loadData();
   }, []);
 
-  // Auto-scroll on new messages
+  // Scroll to top on mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
+  // Auto-scroll inside chat box only on new messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [messages, loading]);
 
   const handleSend = async (messageText) => {
