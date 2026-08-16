@@ -12,7 +12,7 @@ export default function PeekingRobot({ onQuickPrompt }) {
   // Entrance sequence: Pop out center-right -> wave -> slide to right & tilt to peek
   useEffect(() => {
     const speechTimer = setTimeout(() => {
-      setDialogueText("I'll be peeking right here if you need me! ✨");
+      setDialogueText("I'm right here whenever you need me! ✨");
     }, 2200);
 
     const hideTimer = setTimeout(() => {
@@ -339,25 +339,11 @@ export default function PeekingRobot({ onQuickPrompt }) {
               <circle cx="18" cy="65" r="2.5" fill="#22D3EE" />
             </motion.g>
 
-            {/* --- RIGHT ARM (PEEKING WALL-GRIP) --- */}
+            {/* --- RIGHT ARM (WALL-GRIP) --- */}
             <circle cx="114" cy="105" r="4.5" fill="#6366F1" />
             <path d="M 114 105 Q 124 118 122 130" stroke="url(#neonPurpleGlow)" strokeWidth="4.5" strokeLinecap="round" fill="none" />
             <circle cx="122" cy="130" r="5.5" fill="#8B5CF6" stroke="#A78BFA" strokeWidth="1.5" />
           </svg>
-
-          {/* Peeking Floating Click Badge */}
-          {isPeeking && (
-            <motion.div
-              animate={{
-                x: [-3, 3, -3],
-                scale: [1, 1.05, 1],
-              }}
-              transition={{ repeat: Infinity, duration: 1.8 }}
-              className="absolute -top-4 -left-2 px-2.5 py-1 rounded-full bg-violet-900/95 text-ai-cyan-light border border-violet-500/70 text-[10px] font-mono font-extrabold shadow-[0_0_15px_rgba(139,92,246,0.6)] whitespace-nowrap flex items-center gap-1"
-            >
-              <span>👀 Peek!</span>
-            </motion.div>
-          )}
         </motion.div>
       </div>
     </div>
