@@ -354,6 +354,39 @@ async def db_get_proof_documents(member_id: str) -> List[dict]:
 
     return []
 
+async def db_get_proof_file(doc_id: str) -> Optional[dict]:
+    """Retrieve raw file bytes and metadata directly from Neon PostgreSQL (or MongoDB Atlas)."""
+    pool = get_pg_pool()
+    if pool:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT filename, original_filename, content_type, size_bytes, file_data_b64 FROM proof_documents WHERE id = $1;",
+                doc_id
+            )
+            if row and row["file_data_b64"]:
+                raw_bytes = base64.b64decode(row["file_data_b64"])
+                return {
+                    "filename": row["original_filename"] or row["filename"],
+                    "content_type": row["content_type"] or "application/octet-stream",
+                    "file_bytes": raw_bytes
+                }
+
+    mongo_db = get_mongo_db()
+    if mongo_db is not None:
+        try:
+            doc = await mongo_db["proof_documents"].find_one({"id": doc_id})
+            if doc and doc.get("file_data_b64"):
+                raw_bytes = base64.b64decode(doc["file_data_b64"])
+                return {
+                    "filename": doc.get("original_filename") or doc.get("filename"),
+                    "content_type": doc.get("content_type") or "application/octet-stream",
+                    "file_bytes": raw_bytes
+                }
+        except Exception:
+            pass
+
+    return None
+
 async def db_delete_proof_document(member_id: str, doc_id: str) -> bool:
     """Delete proof document from MongoDB Atlas and PostgreSQL."""
     mongo_db = get_mongo_db()

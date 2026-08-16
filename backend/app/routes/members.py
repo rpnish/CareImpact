@@ -3,8 +3,8 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile, Form
-from app.database import get_db, db_save_proof_document, db_delete_proof_document
+from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile, Form, Response
+from app.database import get_db, db_save_proof_document, db_delete_proof_document, db_get_proof_file
 from app.models import (
     MemberDocument,
     MemberFlat,
@@ -275,22 +275,43 @@ async def upload_proof_document(
         "measure_key": measure_key.strip(),
         "filename": saved_filename,
         "original_filename": file.filename or saved_filename,
-        "file_url": f"/uploads/{member_id}/{saved_filename}",
+        "file_url": f"/members/{member_id}/proof-documents/{doc_id}/download",
         "content_type": file.content_type or "application/octet-stream",
         "size_bytes": len(content),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "notes": notes.strip() if notes else None
     }
     
-    # Store proof document & binary content in MongoDB Atlas & PostgreSQL
+    # Store proof document & binary content in Neon PostgreSQL & MongoDB Atlas
     await db_save_proof_document(doc_metadata, file_bytes=content)
     
     updated_member = await members_coll.find_one({"_id": member_id})
     return {
-        "message": "Proof document uploaded successfully to MongoDB Atlas & PostgreSQL",
+        "message": "Proof document uploaded and stored in Neon PostgreSQL successfully",
         "document": doc_metadata,
         "member": doc_to_flat(updated_member)
     }
+
+@router.get("/{member_id}/proof-documents/{doc_id}/download")
+async def download_proof_document(member_id: str, doc_id: str):
+    """
+    Stream and view uploaded hospital proof document directly from Neon PostgreSQL.
+    Works permanently across any hosting environment (Render, Vercel, Railway, etc.).
+    """
+    file_info = await db_get_proof_file(doc_id)
+    if not file_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proof document with ID '{doc_id}' not found"
+        )
+        
+    return Response(
+        content=file_info["file_bytes"],
+        media_type=file_info["content_type"],
+        headers={
+            "Content-Disposition": f'inline; filename="{file_info["filename"]}"'
+        }
+    )
 
 @router.delete("/{member_id}/proof-documents/{doc_id}")
 async def delete_proof_document(member_id: str, doc_id: str):
