@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Eye, HeartPulse, Pill, Syringe, ArrowRight, Star } from 'lucide-react';
-import StatusBadge from './StatusBadge';
+import { Eye, HeartPulse, Pill, Syringe, ArrowRight, Star, SlidersHorizontal } from 'lucide-react';
 
 const MEASURE_ICONS = {
   diabetic_eye_exam: Eye,
@@ -13,18 +12,56 @@ const MEASURE_ICONS = {
 
 export default function MeasureProgressCards({ measures = [] }) {
   const navigate = useNavigate();
+  const [showAllFour, setShowAllFour] = useState(true);
+
+  const displayedMeasures = showAllFour ? measures : measures.slice(0, 3);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800/80 space-y-6">
+      {/* Header with 3 vs 4 toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">HEDIS Quality Measure Performance</h2>
-          <p className="text-xs text-slate-400">Live compliance rates evaluated against NCQA MY2026 cutpoints</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="p-1.5 rounded-lg bg-violet-500/15 text-ai-purple border border-violet-500/30">
+              <SlidersHorizontal className="w-4 h-4" />
+            </span>
+            <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
+              HEDIS Quality Measures Matrix
+            </h2>
+          </div>
+          <p className="text-xs text-slate-400">
+            Live compliance rates mapped against official 2026 CMS Part C cutpoints
+          </p>
+        </div>
+
+        {/* 3 vs 4 measure toggle */}
+        <div className="flex items-center p-1 rounded-xl bg-navy-950 border border-slate-800 self-start sm:self-auto">
+          <button
+            onClick={() => setShowAllFour(false)}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              !showAllFour
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Core 3 Measures
+          </button>
+          <button
+            onClick={() => setShowAllFour(true)}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              showAllFour
+                ? 'bg-violet-950/80 text-ai-purple-light border border-violet-800/60 shadow-glow-purple'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            All 4 Measures
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {measures.map((m, idx) => {
+      {/* Asymmetric Clinical Measures Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {displayedMeasures.map((m, idx) => {
           const Icon = MEASURE_ICONS[m.measure_key] || HeartPulse;
           const rate = m.rate_pct ?? 0;
           const stars = m.current_stars ?? 3.0;
@@ -32,128 +69,85 @@ export default function MeasureProgressCards({ measures = [] }) {
           const cut4 = m.cutpoint_4star ?? 75;
           const cut5 = m.cutpoint_5star ?? 85;
 
-          // Next target cutpoint
-          let nextTarget = cut4;
-          let nextLabel = '4-Star Target';
+          let targetCut = cut4;
+          let targetStar = 4;
           if (rate >= cut4) {
-            nextTarget = cut5;
-            nextLabel = '5-Star Target';
+            targetCut = cut5;
+            targetStar = 5;
           }
           if (rate >= cut5) {
-            nextTarget = 100;
-            nextLabel = 'Max 5-Star Cap';
+            targetCut = 100;
+            targetStar = 5;
           }
 
-          const gapToNext = Math.max(0, (nextTarget - rate)).toFixed(1);
+          const gapToNext = Math.max(0, targetCut - rate).toFixed(1);
 
           return (
             <motion.div
               key={m.measure_key}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: idx * 0.1, duration: 0.4 }}
-              className="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all group"
+              transition={{ delay: idx * 0.08, duration: 0.4 }}
+              onClick={() => navigate(`/members?status=pending&measure=${m.measure_key}`)}
+              className="p-5 rounded-2xl bg-navy-950/80 border border-slate-800/80 hover:border-violet-500/40 cursor-pointer transition-all space-y-3 group"
             >
-              <div>
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-slate-800/80 text-teal-light border border-slate-700 group-hover:scale-105 transition-transform">
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-white leading-tight">{m.name}</h3>
-                      <span className="text-[11px] font-mono text-slate-400">{m.code}</span>
-                    </div>
+              {/* Top info */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-violet-500/15 text-ai-purple-light border border-violet-500/30 group-hover:scale-105 transition-transform">
+                    <Icon className="w-4 h-4" />
                   </div>
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-light border border-amber-500/20 text-xs font-bold">
-                    <Star className="w-3 h-3 fill-amber-light" />
+                  <div>
+                    <h3 className="text-sm font-bold text-white group-hover:text-ai-purple-light transition-colors">
+                      {m.name}
+                    </h3>
+                    <span className="text-[11px] font-mono text-slate-500">{m.code}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-sm font-black text-white font-mono">{rate.toFixed(1)}%</span>
+                  <div className="flex items-center gap-0.5 text-amber-400 text-xs justify-end">
                     <span>{stars.toFixed(1)}</span>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">
-                  {m.description}
-                </p>
-
-                {/* Progress Bar & Rate */}
-                <div className="space-y-1.5 mb-4">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-2xl font-extrabold text-white">{rate}%</span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      {rate >= cut5 ? '5-Star Reached' : `${gapToNext}% to ${nextLabel}`}
-                    </span>
-                  </div>
-
-                  {/* Visual multi-cutpoint progress bar */}
-                  <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800 relative">
-                    {/* 4-Star marker line */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-sky-400/60 z-10"
-                      style={{ left: `${cut4}%` }}
-                      title={`4-Star Cutpoint: ${cut4}%`}
-                    />
-                    {/* 5-Star marker line */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-teal-light/70 z-10"
-                      style={{ left: `${cut5}%` }}
-                      title={`5-Star Cutpoint: ${cut5}%`}
-                    />
-                    
-                    {/* Animated Fill Bar */}
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: `${Math.min(rate, 100)}%` }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, ease: 'easeOut', delay: idx * 0.15 }}
-                      className={`h-full rounded-full ${
-                        rate >= cut5
-                          ? 'bg-gradient-to-r from-teal to-teal-light'
-                          : rate >= cut4
-                          ? 'bg-gradient-to-r from-sky-500 to-teal'
-                          : rate >= cut3
-                          ? 'bg-gradient-to-r from-amber to-sky-400'
-                          : 'bg-gradient-to-r from-rose to-amber'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Cutpoint legend ticks */}
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-0.5">
-                    <span>0%</span>
-                    <span>3★: {cut3}%</span>
-                    <span>4★: {cut4}%</span>
-                    <span>5★: {cut5}%</span>
-                  </div>
-                </div>
-
-                {/* Counts breakdown */}
-                <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 rounded-xl bg-navy-950/70 border border-slate-800 text-center text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Eligible</span>
-                    <span className="font-bold text-slate-200">{m.eligible_count}</span>
-                  </div>
-                  <div className="border-x border-slate-800">
-                    <span className="text-[10px] text-teal-light block">Compliant</span>
-                    <span className="font-bold text-teal-light">{m.compliant_count}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-rose-light block">Open Gaps</span>
-                    <span className="font-bold text-rose-light">{m.gap_count}</span>
+                    <Star className="w-3 h-3 fill-amber-400" />
                   </div>
                 </div>
               </div>
 
-              {/* Action link to filter members */}
-              <button
-                onClick={() => navigate(`/members?measure=${m.measure_key}`)}
-                className="mt-4 w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 bg-slate-800/40 hover:bg-slate-800 hover:text-white transition-all group/btn"
-              >
-                <span>View {m.gap_count} Open Gaps</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform text-slate-400 group-hover/btn:text-teal-light" />
-              </button>
+              {/* Multi-tiered progress bar with cutpoint benchmarks */}
+              <div className="space-y-1.5 pt-1">
+                <div className="relative h-2.5 rounded-full bg-slate-850 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, rate)}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                    className="h-full bg-gradient-to-r from-ai-violet via-ai-purple to-ai-purple-light rounded-full shadow-glow-purple"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+                  <span>3★: {cut3}%</span>
+                  <span>4★: {cut4}%</span>
+                  <span>5★: {cut5}%</span>
+                </div>
+              </div>
+
+              {/* Bottom footer tags */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-850 text-xs">
+                <span className="text-slate-400 font-mono text-[11px]">
+                  {m.gap_count > 0 ? (
+                    <span className="text-rose-400 font-bold">{m.gap_count} Open Gaps</span>
+                  ) : (
+                    <span className="text-emerald-400 font-bold">100% Compliant</span>
+                  )}
+                </span>
+
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-ai-purple-light group-hover:translate-x-0.5 transition-transform">
+                  <span>{rate >= cut5 ? 'At Top Tier' : `+${gapToNext}% to ${targetStar}★`}</span>
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
             </motion.div>
           );
         })}

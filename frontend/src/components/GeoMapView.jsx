@@ -43,8 +43,8 @@ export default function GeoMapView({ geoPoints = [] }) {
       if (!point.lat || !point.lng) return;
 
       const hasGaps = point.pending_members > 0;
-      const fillColor = hasGaps ? '#F43F5E' : '#14B8A6';
-      const strokeColor = hasGaps ? '#E11D48' : '#0D9488';
+      const fillColor = hasGaps ? '#F43F5E' : '#10B981';
+      const strokeColor = hasGaps ? '#E11D48' : '#059669';
       const radius = Math.max(7, Math.min(22, 6 + point.total_members * 2.5));
 
       const marker = L.circleMarker([point.lat, point.lng], {
@@ -58,22 +58,12 @@ export default function GeoMapView({ geoPoints = [] }) {
 
       // Popup Content
       const popupHtml = `
-        <div style="font-family: inherit; font-size: 12px; color: #F1F5F9; min-width: 150px;">
-          <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #FFFFFF;">
-            ${point.city}, ${point.state}
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 3px; color: #94A3B8;">
-            <span>Total Members:</span>
-            <strong style="color: #FFFFFF;">${point.total_members}</strong>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 3px; color: #14B8A6;">
-            <span>Completed:</span>
-            <strong>${point.completed_members}</strong>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #F43F5E;">
-            <span>Pending Gaps:</span>
-            <strong>${point.pending_members}</strong>
-          </div>
+        <div style="font-family: Inter, sans-serif; min-width: 170px;">
+          <h4 style="margin: 0 0 6px 0; font-weight: 700; font-size: 13px; color: #FFFFFF;">${point.city}, MA</h4>
+          <div style="font-size: 11px; margin-bottom: 3px; color: #94A3B8;">Total Members: <strong style="color: #F1F5F9;">${point.total_members}</strong></div>
+          <div style="font-size: 11px; margin-bottom: 3px; color: #10B981;">Completed: <strong>${point.completed_members}</strong></div>
+          <div style="font-size: 11px; margin-bottom: 8px; color: #F43F5E;">Pending Gaps: <strong>${point.pending_members}</strong></div>
+          <a href="/members?search=${encodeURIComponent(point.city)}" style="display: inline-block; padding: 4px 10px; background: #8B5CF6; color: #060814; font-size: 10px; font-weight: 700; border-radius: 6px; text-decoration: none;">Filter City Members &rarr;</a>
         </div>
       `;
 
@@ -82,41 +72,31 @@ export default function GeoMapView({ geoPoints = [] }) {
   }, [geoPoints]);
 
   return (
-    <div className="glass-card rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-3">
+    <div className="glass-card rounded-3xl p-6 sm:p-7 border border-slate-800/80 flex flex-col justify-between h-full min-h-[340px] space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-teal-light" />
-            Geographic Gap Distribution (Massachusetts Cohort)
-          </h3>
-          <p className="text-xs text-slate-400">Members plotted by city with pending gap clustering</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="p-1.5 rounded-lg bg-cyan-500/15 text-ai-cyan border border-cyan-500/30">
+              <MapPin className="w-4 h-4" />
+            </span>
+            <h3 className="text-base font-bold text-white tracking-tight">Geographic Care Distribution</h3>
+          </div>
+          <p className="text-xs text-slate-400">Massachusetts regional gap density and hotspot cities</p>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-light"></span>
-            <span className="text-slate-300">All Gaps Closed</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-light"></span>
-            <span className="text-slate-300">Has Pending Gaps</span>
-          </div>
+
+        {/* Legend */}
+        <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Gap-Free
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-rose-500"></span> Open Gaps
+          </span>
         </div>
       </div>
 
-      {/* Map Canvas */}
-      <div className="h-80 w-full rounded-xl overflow-hidden border border-slate-800 relative">
+      <div className="h-56 w-full rounded-2xl overflow-hidden border border-slate-800/80 relative">
         <div ref={mapContainerRef} className="w-full h-full" />
-      </div>
-
-      <div className="flex items-center justify-between text-xs text-slate-400 pt-3 mt-3 border-t border-slate-800">
-        <span>Click any marker to inspect city counts</span>
-        <button
-          onClick={() => navigate('/members')}
-          className="flex items-center gap-1 text-teal-light hover:underline"
-        >
-          <span>View all members in table</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
       </div>
     </div>
   );
