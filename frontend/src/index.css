@@ -1,14 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-950: #070C18;
-  --color-navy-900: #0B132B;
-  --color-navy-850: #111C38;
-  --color-navy-800: #1C2541;
-  --color-navy-700: #2A365B;
+  --color-navy-950: #060814;
+  --color-navy-900: #0B0F24;
+  --color-navy-850: #101633;
+  --color-navy-800: #182046;
+  --color-navy-700: #242E5E;
 
-  --color-slate-850: #151E2E;
-  --color-slate-750: #243044;
+  --color-slate-850: #12182B;
+  --color-slate-750: #1F2942;
+
+  --color-ai-purple: #8B5CF6;
+  --color-ai-purple-light: #A78BFA;
+  --color-ai-violet: #7C3AED;
+  --color-ai-indigo: #6366F1;
+  --color-ai-cyan: #06B6D4;
+  --color-ai-cyan-light: #22D3EE;
+  --color-ai-emerald: #10B981;
+  --color-ai-rose: #F43F5E;
 
   --color-teal: #0D9488;
   --color-teal-light: #14B8A6;
@@ -30,71 +39,140 @@
 
 body {
   margin: 0;
-  background-color: #070C18;
+  background-color: #060814;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #F1F5F9;
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
-/* Custom modern scrollbar */
+/* Modern AI futuristic scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B132B;
+  background: #0B0F24;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2A365B;
+  background: #242E5E;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3B4B7A;
+  background: #7C3AED;
 }
 
-/* Glassmorphic card styling */
+/* Glassmorphism 2.0 AI card styling */
 .glass-panel {
-  background: rgba(17, 28, 56, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 22, 51, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 92, 246, 0.12);
 }
 
 .glass-card {
-  background: linear-gradient(135deg, rgba(28, 37, 65, 0.85) 0%, rgba(17, 28, 56, 0.65) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(135deg, rgba(24, 32, 70, 0.75) 0%, rgba(11, 15, 36, 0.85) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.glass-card-ai {
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.5) 0%, rgba(11, 15, 36, 0.9) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 10px 35px -5px rgba(124, 58, 237, 0.15);
+}
+
+/* Neon AI glowing shadows */
+.shadow-glow-purple {
+  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.4);
+}
+
+.shadow-glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.4);
+}
+
+.shadow-glow-teal {
+  box-shadow: 0 0 20px -5px rgba(20, 184, 166, 0.35);
+}
+
+/* Custom Neon Range Slider */
+input[type="range"].ai-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #182046;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type="range"].ai-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #A78BFA;
+  border: 3px solid #0B0F24;
+  box-shadow: 0 0 12px #8B5CF6;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+input[type="range"].ai-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 20px #A78BFA;
+}
+
+input[type="range"].ai-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #A78BFA;
+  border: 3px solid #0B0F24;
+  box-shadow: 0 0 12px #8B5CF6;
+  cursor: pointer;
 }
 
 /* Leaflet map custom dark styling */
 .leaflet-container {
   width: 100%;
   height: 100%;
-  border-radius: 0.75rem;
-  background-color: #0B132B !important;
+  border-radius: 1rem;
+  background-color: #0B0F24 !important;
   font-family: inherit;
 }
 
 .leaflet-popup-content-wrapper {
-  background: #111C38 !important;
+  background: #101633 !important;
   color: #F1F5F9 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.5rem !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
 }
 
 .leaflet-popup-tip {
-  background: #111C38 !important;
+  background: #101633 !important;
 }
 
 .leaflet-popup-content {
-  margin: 10px 12px !important;
+  margin: 10px 14px !important;
   line-height: 1.4 !important;
 }

@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import MemberDetail from './pages/MemberDetail';
+import StarSimulator from './pages/StarSimulator';
 import { ToastProvider } from './components/Toast';
 import AddMemberModal from './components/AddMemberModal';
 
@@ -17,7 +18,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-navy-950 text-slate-100 flex flex-col selection:bg-teal selection:text-white">
+    <div className="min-h-screen bg-navy-950 text-slate-100 flex flex-col selection:bg-violet-600 selection:text-white font-sans">
       {/* Top Sticky Navigation */}
       <Navbar onOpenAddMember={() => setIsAddModalOpen(true)} />
 
@@ -34,6 +35,7 @@ function AppContent() {
             }
           />
           <Route path="/members/:id" element={<MemberDetail />} />
+          <Route path="/simulator" element={<StarSimulator />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -49,11 +51,11 @@ function AppContent() {
       <footer className="border-t border-slate-800/80 bg-navy-950/90 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">Medicare Star Ratings & Gap-Closure Simulator</span>
+            <span className="font-semibold text-slate-400">CareImpact · Medicare Star Ratings & Gap-Closure Simulator</span>
             <span>·</span>
             <span>NCQA HEDIS MY2026</span>
           </div>
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[11px] text-slate-600 font-mono">
             Single Source of Truth: <code className="text-slate-400 font-mono">/data/data.csv</code> · FastAPI + MongoDB Atlas + React
           </div>
         </div>
