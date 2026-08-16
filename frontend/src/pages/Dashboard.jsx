@@ -71,7 +71,7 @@ export default function Dashboard() {
           </div>
           <h2 className="text-xl font-bold text-white">Dashboard Service Unavailable</h2>
           <p className="text-sm text-slate-300 max-w-md mx-auto">{error}</p>
-          <p className="text-xs text-slate-500 font-mono">Ensure backend is running at http://127.0.0.1:8000</p>
+          <p className="text-xs text-slate-500 font-mono">Ensure backend is active and reachable</p>
           <button
             onClick={fetchData}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal"
