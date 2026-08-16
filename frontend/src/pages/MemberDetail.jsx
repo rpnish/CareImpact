@@ -23,7 +23,7 @@ import {
   Upload,
   ExternalLink,
 } from 'lucide-react';
-import { api } from '../api/client';
+import { api, API_BASE_URL } from '../api/client';
 import { useToast } from '../components/Toast';
 import StatusBadge from '../components/StatusBadge';
 import EditMemberModal from '../components/EditMemberModal';
@@ -386,7 +386,7 @@ export default function MemberDetail() {
                     </div>
                   </div>
                   <a
-                    href={`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}${doc.file_url}`}
+                    href={`${API_BASE_URL}${doc.file_url}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 rounded-lg text-slate-400 hover:text-teal-light hover:bg-slate-800 transition-colors shrink-0"

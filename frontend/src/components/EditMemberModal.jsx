@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Edit3, HeartPulse, Eye, Pill, Syringe, Sparkles, Upload, FileText, CheckCircle2, Trash2, Paperclip, ExternalLink } from 'lucide-react';
-import { api } from '../api/client';
+import { api, API_BASE_URL } from '../api/client';
 import { useToast } from './Toast';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 export default function EditMemberModal({ isOpen, onClose, member, onMemberUpdated }) {
   const toast = useToast();

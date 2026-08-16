@@ -1,4 +1,20 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+export const getApiBaseUrl = () => {
+  // If explicitly set in environment variable, prioritize that
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // If running in browser on localhost or 127.0.0.1, always use local backend
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://127.0.0.1:8000';
+    }
+  }
+  // Fallback for hosted production (Vercel / Cloud)
+  return 'https://careimpact.onrender.com';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
