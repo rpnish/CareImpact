@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     
     PROJECT_NAME: str = "Medicare Star Ratings & Gap-Closure Simulator"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     MONGODB_URI: str = os.getenv("MONGODB_URI", "")
     DB_NAME: str = os.getenv("DB_NAME", "medicare_star_ratings")
     DATA_CSV_PATH: str = os.getenv(

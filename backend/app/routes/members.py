@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, status, File, UploadFile, Form
-from app.database import get_db
+from app.database import get_db, db_save_proof_document, db_delete_proof_document
 from app.models import (
     MemberDocument,
     MemberFlat,
@@ -264,13 +264,14 @@ async def upload_proof_document(
     saved_filename = f"{doc_id[:8]}_{safe_filename}"
     file_path = upload_dir / saved_filename
 
-    # Save file contents
+    # Save file contents locally
     content = await file.read()
     with open(file_path, "wb") as f:
         f.write(content)
         
     doc_metadata = {
         "id": doc_id,
+        "member_id": member_id,
         "measure_key": measure_key.strip(),
         "filename": saved_filename,
         "original_filename": file.filename or saved_filename,
@@ -281,18 +282,12 @@ async def upload_proof_document(
         "notes": notes.strip() if notes else None
     }
     
-    # Append document to member in MongoDB
-    await members_coll.update_one(
-        {"_id": member_id},
-        {
-            "$push": {"proof_documents": doc_metadata},
-            "$set": {"updatedAt": datetime.now(timezone.utc).isoformat()}
-        }
-    )
+    # Store proof document & binary content in MongoDB Atlas & PostgreSQL
+    await db_save_proof_document(doc_metadata, file_bytes=content)
     
     updated_member = await members_coll.find_one({"_id": member_id})
     return {
-        "message": "Proof document uploaded successfully",
+        "message": "Proof document uploaded successfully to MongoDB Atlas & PostgreSQL",
         "document": doc_metadata,
         "member": doc_to_flat(updated_member)
     }
@@ -300,7 +295,7 @@ async def upload_proof_document(
 @router.delete("/{member_id}/proof-documents/{doc_id}")
 async def delete_proof_document(member_id: str, doc_id: str):
     """
-    Delete a proof document from a member.
+    Delete a proof document from a member across MongoDB Atlas and PostgreSQL.
     """
     db = get_db()
     members_coll = db["members"]
@@ -312,33 +307,17 @@ async def delete_proof_document(member_id: str, doc_id: str):
             detail=f"Member with ID '{member_id}' not found"
         )
         
-    proofs = existing.get("proof_documents", [])
-    doc_to_delete = next((p for p in proofs if p.get("id") == doc_id), None)
-    
-    if not doc_to_delete:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Proof document with ID '{doc_id}' not found"
-        )
-        
     # Remove file from disk if exists
     try:
-        fpath = Path("uploads") / member_id / doc_to_delete.get("filename", "")
-        if fpath.exists():
-            fpath.unlink()
+        fpath = Path("uploads") / member_id
+        for f in fpath.glob(f"{doc_id[:8]}_*"):
+            if f.exists():
+                f.unlink()
     except Exception:
         pass
         
-    # Remove from MongoDB
-    await members_coll.update_one(
-        {"_id": member_id},
-        {
-            "$pull": {"proof_documents": {"id": doc_id}},
-            "$set": {"updatedAt": datetime.now(timezone.utc).isoformat()}
-        }
-    )
-    
-    return {"message": "Proof document deleted successfully", "doc_id": doc_id}
+    await db_delete_proof_document(member_id, doc_id)
+    return {"message": "Proof document deleted successfully from MongoDB Atlas & PostgreSQL", "doc_id": doc_id}
 
 @router.delete("/{member_id}", status_code=status.HTTP_200_OK)
 async def delete_member(member_id: str):

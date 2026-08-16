@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, db_save_member
 from app.gap_engine import evaluate_member_measures
 
 # TODO: priorityScore is a placeholder (always 0). Real prioritization
@@ -234,16 +234,11 @@ async def run_ingestion(csv_path_override: Optional[str] = None) -> Dict[str, An
         _last_sync_status = sync_result
         return sync_result
 
-    # Upsert into MongoDB
+    # Upsert into Neon PostgreSQL & MongoDB Atlas
     for doc in rows_to_process:
         try:
-            existing = await members_coll.find_one({"_id": doc["_id"]})
-            if existing:
-                await members_coll.update_one({"_id": doc["_id"]}, {"$set": doc})
-                sync_result["updated"] += 1
-            else:
-                await members_coll.insert_one(doc)
-                sync_result["inserted"] += 1
+            await db_save_member(doc)
+            sync_result["inserted"] += 1
         except Exception as e:
             err = f"Failed to upsert member {doc.get('_id')}: {str(e)}"
             logger.error(err)
