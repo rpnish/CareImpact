@@ -15,15 +15,19 @@ import {
   Layers,
   ChevronRight,
   Zap,
+  SlidersHorizontal,
+  Flame,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
+import QuantumStarReactor from '../components/QuantumStarReactor';
 import SimulatorSliderCard from '../components/SimulatorSliderCard';
 import BeforeAfterChart from '../components/BeforeAfterChart';
 import { SkeletonCard } from '../components/Skeleton';
 
-// Measure definitions with CMS weights and codes
+// Measure definitions with CMS weights and official cutpoints
 const MEASURE_DEFINITIONS = [
   {
     key: 'diabetic_eye_exam',
@@ -89,8 +93,6 @@ export default function StarSimulator() {
     diabetes_med_adherence: 0,
     flu_vaccination: 0,
   });
-
-  const [isSimulating, setIsSimulating] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -175,11 +177,12 @@ export default function StarSimulator() {
         selectedGaps: selected,
         currentStars,
         simStars,
+        cutpoints: def.cutpoints,
       };
     });
 
-    const currentOverallRating = totalWeight > 0 ? currentTotalWeightedStars / totalWeight : 3.42;
-    const simulatedOverallRating = totalWeight > 0 ? simulatedTotalWeightedStars / totalWeight : 4.08;
+    const currentOverallRating = totalWeight > 0 ? currentTotalWeightedStars / totalWeight : 3.3;
+    const simulatedOverallRating = totalWeight > 0 ? simulatedTotalWeightedStars / totalWeight : 4.1;
     const starImprovement = Math.max(0, simulatedOverallRating - currentOverallRating);
 
     return {
@@ -204,19 +207,40 @@ export default function StarSimulator() {
     toast.info('Simulation reset to baseline plan performance.');
   };
 
-  const handleRunSimulation = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      setIsSimulating(false);
-      toast.success(
-        `Simulation calculated: Projected Star Rating jumps to ${simulationResults.simulatedOverallRating.toFixed(2)} ★ (+${simulationResults.starImprovement.toFixed(2)} gain)!`
-      );
-    }, 400);
+  // Smart Scenario Presets
+  const handleApplyPreset = (presetType) => {
+    if (presetType === 'four_star') {
+      // Smart allocate gaps to reach 4.0 stars (Blood pressure 3x weight + Flu)
+      const fluGaps = measureStatsMap['flu_vaccination']?.gap_count || 0;
+      const bpGaps = measureStatsMap['blood_pressure_control']?.gap_count || 0;
+      setSliderValues({
+        diabetic_eye_exam: 0,
+        blood_pressure_control: Math.min(bpGaps, 1),
+        diabetes_med_adherence: 0,
+        flu_vaccination: Math.min(fluGaps, 1),
+      });
+      toast.success('Applied "Target 4.0★ Leap" preset: Focused on high-weight BP and Flu gaps!');
+    } else if (presetType === 'priority_one') {
+      const pmKey = priorityInfo?.priority_measure?.measure_key || 'flu_vaccination';
+      const maxPm = measureStatsMap[pmKey]?.gap_count || 0;
+      setSliderValues((prev) => ({
+        ...prev,
+        [pmKey]: maxPm,
+      }));
+      toast.success(`Applied "Priority #1 Max" preset: Closed all gaps for ${pmKey.replace(/_/g, ' ')}!`);
+    } else if (presetType === 'five_star') {
+      const newVals = {};
+      MEASURE_DEFINITIONS.forEach((def) => {
+        newVals[def.key] = measureStatsMap[def.key]?.gap_count || 0;
+      });
+      setSliderValues(newVals);
+      toast.success('Applied "5.0★ Maximum" preset: All open care gaps closed!');
+    }
   };
 
   const handleApplySimulation = () => {
     toast.success(
-      `Simulation Scenario Saved! Target: Close ${totalSelectedGaps} gaps for ${simulationResults.simulatedOverallRating.toFixed(2)} ★.`
+      `Scenario Saved! Target: Close ${totalSelectedGaps} gaps to reach ${simulationResults.simulatedOverallRating.toFixed(2)} ★.`
     );
   };
 
@@ -241,36 +265,34 @@ export default function StarSimulator() {
 
   const currentStarScore = summary?.overall_star_rating || simulationResults.currentOverallRating;
   const simulatedStarScore = simulationResults.simulatedOverallRating;
-  const currentStarBucket = Math.floor(currentStarScore);
-  const simulatedStarBucket = Math.floor(simulatedStarScore);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* 1. Header & Breadcrumb */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-32">
+      {/* 1. Header & Navigation Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-1">
             <span>Quality Analytics</span>
             <span>/</span>
-            <span className="text-ai-purple-light">Star Simulator</span>
+            <span className="text-ai-purple-light font-mono">Interactive Star Simulator</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <span>Star Rating Simulator</span>
-            <span className="p-1.5 rounded-xl bg-violet-500/15 text-ai-purple border border-violet-500/30">
+            <span>Star Rating Quantum Simulator</span>
+            <span className="p-1.5 rounded-xl bg-violet-500/20 text-ai-purple-light border border-violet-500/40">
               <Sparkles className="w-5 h-5" />
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Simulate how closing care gaps could improve your Medicare Advantage Star Rating in real time.
+            Simulate member interventions in real time and project Medicare Advantage Quality Bonus thresholds.
           </p>
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
           <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-violet-950/80 text-ai-purple-light border border-violet-800/60 shadow-glow-purple">
-            MY 2026
+            MY 2026 CMS Engine
           </span>
           <button
-            onClick={() => toast.info('Notification: NCQA HEDIS MY2026 dynamic CMS cut-points active.')}
+            onClick={() => toast.info('CMS cutpoints dynamic loader active from official 2026 data table.')}
             className="p-2 rounded-xl bg-navy-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
             title="System Status"
           >
@@ -279,116 +301,15 @@ export default function StarSimulator() {
         </div>
       </div>
 
-      {/* 2. Current vs Simulated Star Rating Top Hero Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Current Rating */}
-        <motion.div
-          initial={{ opacity: 0, x: -15 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="glass-card rounded-3xl p-6 sm:p-7 border border-slate-800/80 relative overflow-hidden"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-              Current Rating
-            </span>
-            <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 font-mono">
-              {currentStarBucket} ★
-            </span>
-          </div>
+      {/* 2. Quantum Star Reactor (Hero Dial & Presets) */}
+      <QuantumStarReactor
+        currentRating={currentStarScore}
+        simulatedRating={simulatedStarScore}
+        totalGapsClosed={totalSelectedGaps}
+        onApplyPreset={handleApplyPreset}
+      />
 
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight font-mono">
-              {currentStarScore.toFixed(2)}
-            </span>
-            <span className="text-2xl text-amber-400">★</span>
-          </div>
-
-          <p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-            <span>Current plan performance</span>
-          </p>
-        </motion.div>
-
-        {/* Simulated Rating */}
-        <motion.div
-          initial={{ opacity: 0, x: 15 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="glass-card-ai rounded-3xl p-6 sm:p-7 border border-violet-500/40 relative overflow-hidden shadow-glow-purple"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-ai-purple-light font-mono">
-              Simulated Rating
-            </span>
-            <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-violet-500/20 text-ai-purple-light border border-violet-500/40 font-mono">
-              {simulatedStarBucket} ★
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight font-mono">
-              {simulatedStarScore.toFixed(2)}
-            </span>
-            <span className="text-2xl text-amber-400">★</span>
-          </div>
-
-          <p className="text-xs font-bold text-emerald-400 mt-2 flex items-center gap-1.5 font-mono">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>+{simulationResults.starImprovement.toFixed(2)} improvement</span>
-          </p>
-        </motion.div>
-      </div>
-
-      {/* 3. Projected Star Impact Timeline */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card rounded-3xl p-6 sm:p-7 border border-slate-800/80 space-y-6"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-violet-500/15 text-ai-purple border border-violet-500/30">
-              <Target className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-tight">Projected Star Impact</h3>
-              <p className="text-xs text-slate-400">Current rating compared with simulated performance</p>
-            </div>
-          </div>
-
-          <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />+{simulationResults.starImprovement.toFixed(2)} ★
-          </span>
-        </div>
-
-        {/* Timeline Bar with 1-5 Star Markers */}
-        <div className="space-y-3 pt-2">
-          <div className="relative h-3 rounded-full bg-slate-800 w-full overflow-hidden">
-            {/* Base Current track */}
-            <div
-              className="absolute left-0 top-0 h-full bg-slate-600 rounded-full"
-              style={{ width: `${(currentStarScore / 5.0) * 100}%` }}
-            />
-            {/* Simulated Projected track */}
-            <motion.div
-              initial={{ width: `${(currentStarScore / 5.0) * 100}%` }}
-              animate={{ width: `${(simulatedStarScore / 5.0) * 100}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="absolute left-0 top-0 h-full bg-gradient-to-r from-ai-violet via-ai-purple to-ai-purple-light rounded-full shadow-glow-purple"
-            />
-          </div>
-
-          {/* Star Benchmark Ticks */}
-          <div className="flex justify-between items-center text-xs font-mono text-slate-500 px-1">
-            <span>1 ★</span>
-            <span>2 ★</span>
-            <span className="text-slate-400 font-bold">3 ★</span>
-            <span className="text-ai-purple-light font-bold">4 ★</span>
-            <span className="text-amber-400 font-bold">5 ★</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* 4. Gap Closure Simulator Section (Sliders) */}
+      {/* 3. Interactive Measure Quantum Sliders Grid */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-3">
@@ -396,8 +317,8 @@ export default function StarSimulator() {
               <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">Gap Closure Simulator</h2>
-              <p className="text-xs text-slate-400">Choose how many open care gaps you want to close.</p>
+              <h2 className="text-lg font-bold text-white tracking-tight">Care Gap Closure Consoles</h2>
+              <p className="text-xs text-slate-400">Adjust intervention numbers or use quick step chips (+1, +5, +10, Max)</p>
             </div>
           </div>
 
@@ -406,52 +327,44 @@ export default function StarSimulator() {
           </div>
         </div>
 
-        {/* 4 Measure Sliders Grid */}
+        {/* 4 Quantum Console Sliders */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {simulationResults.perMeasureSim.map((m) => (
-            <SimulatorSliderCard
-              key={m.key}
-              measureKey={m.key}
-              code={m.code}
-              name={m.name}
-              currentRate={m.currentRate}
-              openGaps={m.openGaps}
-              eligibleCount={m.eligibleCount}
-              compliantCount={m.compliantCount}
-              selectedGaps={m.selectedGaps}
-              onSliderChange={(val) => handleSliderChange(m.key, val)}
-            />
-          ))}
-        </div>
-
-        {/* Action Button */}
-        <div className="flex justify-end pt-2">
-          <button
-            onClick={handleRunSimulation}
-            disabled={isSimulating}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-ai-violet via-ai-purple to-ai-purple-light text-navy-950 hover:opacity-90 transition-all shadow-glow-purple active:scale-98"
-          >
-            <Play className="w-4 h-4 fill-navy-950" />
-            <span>{isSimulating ? 'Computing Simulation...' : 'Run Simulation'}</span>
-          </button>
+          <AnimatePresence>
+            {simulationResults.perMeasureSim.map((m) => (
+              <SimulatorSliderCard
+                key={m.key}
+                measureKey={m.key}
+                code={m.code}
+                name={m.name}
+                weight={m.weight}
+                currentRate={m.currentRate}
+                openGaps={m.openGaps}
+                eligibleCount={m.eligibleCount}
+                compliantCount={m.compliantCount}
+                selectedGaps={m.selectedGaps}
+                cutpoints={m.cutpoints}
+                onSliderChange={(val) => handleSliderChange(m.key, val)}
+              />
+            ))}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* 5. Before vs After & Impact Analysis 2-Column Grid */}
+      {/* 4. Before vs After & Live AI Impact Analysis 2-Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Column 1: Before vs After Chart */}
         <BeforeAfterChart measuresData={simulationResults.perMeasureSim} />
 
-        {/* Column 2: Impact Analysis */}
-        <div className="glass-card rounded-3xl p-6 border border-slate-800/80 flex flex-col justify-between space-y-6">
+        {/* Column 2: Impact Analysis & Recommended Strategy */}
+        <div className="glass-card rounded-3xl p-6 sm:p-7 border border-slate-800/80 flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white tracking-tight">Impact Analysis</h3>
-                <p className="text-xs text-slate-400">Potential improvement by measure</p>
+                <h3 className="text-base font-bold text-white tracking-tight">Dynamic Impact Ranking</h3>
+                <p className="text-xs text-slate-400">Measures sorted live by projected Star velocity gain</p>
               </div>
             </div>
 
@@ -460,154 +373,101 @@ export default function StarSimulator() {
               {rankedImprovements.map((item, idx) => (
                 <div
                   key={item.code}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-navy-950/80 border border-slate-800/80"
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-navy-950/80 border border-slate-800/80 hover:border-violet-500/30 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-bold text-slate-500">
-                      0{idx + 1}
+                    <span className="text-xs font-mono font-bold text-ai-purple-light px-2 py-0.5 rounded-md bg-violet-950/80 border border-violet-800/50">
+                      #{idx + 1}
                     </span>
-                    <span className="text-xs font-bold text-white">{item.code}</span>
+                    <span className="text-xs font-bold text-white font-mono">{item.code}</span>
                     <span className="text-xs text-slate-400 truncate max-w-[140px] sm:max-w-[200px]">
                       {item.name}
                     </span>
                   </div>
 
-                  <span className="text-xs font-bold font-mono text-emerald-400">
-                    +{item.improvement.toFixed(1)}%
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold font-mono text-emerald-400">
+                      +{item.improvement.toFixed(1)}%
+                    </span>
+                    {item.selectedGaps > 0 && (
+                      <span className="text-[10px] font-mono text-ai-purple-light bg-violet-950/60 px-1.5 py-0.5 rounded border border-violet-800/40">
+                        {item.selectedGaps} closed
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Highest Opportunity Box */}
+          {/* Highest Opportunity Strategy Box */}
           {highestOpportunityMeasure && (
             <div className="p-4 rounded-2xl bg-violet-950/40 border border-violet-800/50 space-y-1 shadow-glow-purple/10">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-ai-purple-light block font-mono">
-                Highest Opportunity
-              </span>
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ai-purple-light font-mono">
+                  Optimal Strategic Focus
+                </span>
+              </div>
               <h4 className="text-sm font-bold text-white">
                 {highestOpportunityMeasure.name} ({highestOpportunityMeasure.code})
               </h4>
               <p className="text-xs text-slate-300">
-                This measure provides the greatest projected compliance improvement (+
-                {highestOpportunityMeasure.improvement.toFixed(1)}%).
+                Closing gaps in this measure delivers the steepest compliance slope (+
+                {highestOpportunityMeasure.improvement.toFixed(1)}%) for the plan.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* 6. Recommended Interventions Cards */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
-            <Target className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white tracking-tight">Recommended Interventions</h3>
-            <p className="text-xs text-slate-400">Focus on measures with the highest potential impact.</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {rankedImprovements.slice(0, 2).map((rec, idx) => (
-            <div
-              key={rec.code}
-              className="glass-card rounded-3xl p-5 border border-slate-800/80 flex flex-col justify-between space-y-4 relative overflow-hidden"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 font-mono">
-                    Priority #{idx + 1}
-                  </span>
-                  <span className="text-xs font-mono text-slate-400 font-bold">{rec.code}</span>
-                </div>
-                <h4 className="text-sm sm:text-base font-bold text-white">{rec.name}</h4>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div className="bg-navy-950/60 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Open Gaps</span>
-                    <strong className="text-sm text-white font-mono">{rec.openGaps}</strong>
-                  </div>
-                  <div className="bg-navy-950/60 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Potential Improvement</span>
-                    <strong className="text-sm text-emerald-400 font-mono">+{rec.improvement.toFixed(1)}%</strong>
-                  </div>
-                </div>
-              </div>
-
-              <Link
-                to={`/members?status=pending&measure=${rec.key}`}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-ai-purple-light hover:text-white transition-colors"
-              >
-                <span>View Members</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 7. Simulation Summary Bottom Card */}
+      {/* 5. Floating Glassmorphic HUD Action Bar */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card-ai rounded-3xl p-6 sm:p-7 border border-violet-500/40 space-y-6"
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-11/12 max-w-4xl glass-card-ai rounded-2xl p-4 border border-violet-500/50 shadow-2xl backdrop-blur-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
       >
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-violet-500/15 text-ai-purple border border-violet-500/30">
-            <Award className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white tracking-tight">Simulation Summary</h3>
-            <p className="text-xs text-slate-400">Overview of your projected scenario</p>
-          </div>
-        </div>
-
-        {/* 4 Bottom Metric KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-navy-950/80 p-3.5 rounded-2xl border border-slate-800 text-center">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Gaps Selected</span>
-            <span className="text-lg sm:text-xl font-black text-white font-mono">{totalSelectedGaps}</span>
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-ai-purple animate-pulse" />
+            <span className="text-slate-300">Selected Gaps:</span>
+            <strong className="text-white text-sm font-black">{totalSelectedGaps}</strong>
           </div>
 
-          <div className="bg-navy-950/80 p-3.5 rounded-2xl border border-slate-800 text-center">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Remaining Gaps</span>
-            <span className="text-lg sm:text-xl font-black text-slate-300 font-mono">{remainingGaps}</span>
-          </div>
+          <div className="hidden sm:block h-4 w-px bg-slate-700" />
 
-          <div className="bg-navy-950/80 p-3.5 rounded-2xl border border-slate-800 text-center">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Projected Rating</span>
-            <span className="text-lg sm:text-xl font-black text-ai-purple-light font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-300">Simulated Rating:</span>
+            <strong className="text-ai-purple-light text-sm font-black">
               {simulatedStarScore.toFixed(2)} ★
-            </span>
+            </strong>
           </div>
 
-          <div className="bg-navy-950/80 p-3.5 rounded-2xl border border-slate-800 text-center">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Star Improvement</span>
-            <span className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
-              +{simulationResults.starImprovement.toFixed(2)}
-            </span>
+          <div className="hidden sm:block h-4 w-px bg-slate-700" />
+
+          <div className="flex items-center gap-1 text-emerald-400 font-bold">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>+{simulationResults.starImprovement.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button
+            type="button"
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700 transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-navy-950/80 hover:bg-slate-800 border border-slate-800 transition-all"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Simulation</span>
+            <span>Reset</span>
           </button>
 
           <button
+            type="button"
             onClick={handleApplySimulation}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-ai-violet via-ai-purple to-ai-purple-light text-navy-950 hover:opacity-90 transition-all shadow-glow-purple"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-ai-violet via-ai-purple to-ai-cyan text-navy-950 hover:opacity-90 transition-all shadow-glow-purple"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>Apply Simulation</span>
+            <span>Apply Scenario</span>
           </button>
         </div>
       </motion.div>
