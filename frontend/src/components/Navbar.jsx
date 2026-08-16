@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Star, Users, LayoutDashboard, RefreshCw, Database, Plus, ShieldCheck, Sparkles } from 'lucide-react';
+import { Star, Users, LayoutDashboard, RefreshCw, Database, Plus, ShieldCheck, Sparkles, Bot } from 'lucide-react';
 import { api } from '../api/client';
 import { useToast } from './Toast';
 import SyncModal from './SyncModal';
@@ -52,7 +52,7 @@ export default function Navbar({ onOpenAddMember }) {
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-base text-white tracking-tight">CareImpact</span>
                   <span className="text-[10px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md bg-violet-500/20 text-ai-purple-light border border-violet-500/40">
-                    AI Simulator
+                    Quality AI
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 font-normal">Medicare Advantage Quality Engine</p>
@@ -60,11 +60,11 @@ export default function Navbar({ onOpenAddMember }) {
             </NavLink>
 
             {/* Navigation Tabs */}
-            <nav className="hidden md:flex items-center gap-1.5 ml-6 pl-6 border-l border-slate-800/80">
+            <nav className="hidden md:flex items-center gap-1 ml-6 pl-6 border-l border-slate-800/80">
               <NavLink
                 to="/"
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
                       ? 'bg-slate-800/90 text-white border border-slate-700 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-850'
@@ -78,7 +78,7 @@ export default function Navbar({ onOpenAddMember }) {
               <NavLink
                 to="/members"
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
                       ? 'bg-slate-800/90 text-white border border-slate-700 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-850'
@@ -86,13 +86,13 @@ export default function Navbar({ onOpenAddMember }) {
                 }
               >
                 <Users className="w-4 h-4 text-sky-400" />
-                Members & Gaps
+                Members
               </NavLink>
 
               <NavLink
                 to="/simulator"
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     isActive
                       ? 'bg-violet-950/80 text-ai-purple-light border border-violet-800/60 shadow-glow-purple'
                       : 'text-slate-400 hover:text-ai-purple-light hover:bg-violet-950/30'
@@ -101,6 +101,20 @@ export default function Navbar({ onOpenAddMember }) {
               >
                 <Star className="w-4 h-4 text-ai-purple" />
                 Star Simulator
+              </NavLink>
+
+              <NavLink
+                to="/assistant"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-cyan-950/80 text-ai-cyan-light border border-cyan-700/60 shadow-glow-cyan'
+                      : 'text-slate-400 hover:text-ai-cyan-light hover:bg-cyan-950/30'
+                  }`
+                }
+              >
+                <Bot className="w-4 h-4 text-ai-cyan" />
+                AI Assistant
               </NavLink>
             </nav>
           </div>
@@ -163,6 +177,17 @@ export default function Navbar({ onOpenAddMember }) {
           >
             <Star className="w-4 h-4" />
             Simulator
+          </NavLink>
+          <NavLink
+            to="/assistant"
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-1 text-[10px] font-semibold ${
+                isActive ? 'text-ai-cyan-light' : 'text-slate-400'
+              }`
+            }
+          >
+            <Bot className="w-4 h-4" />
+            AI Copilot
           </NavLink>
         </div>
       </header>

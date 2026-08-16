@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     
     PROJECT_NAME: str = "Medicare Star Ratings & Gap-Closure Simulator"
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     MONGODB_URI: str = os.getenv("MONGODB_URI", "")
     DB_NAME: str = os.getenv("DB_NAME", "medicare_star_ratings")
     DATA_CSV_PATH: str = os.getenv(

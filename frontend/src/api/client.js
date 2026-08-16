@@ -84,6 +84,14 @@ export const api = {
   getGeoData: () => request('/analytics/geo'),
   getPriority: () => request('/analytics/priority'),
 
+  // AI Clinical Assistant
+  sendChatMessage: (message, history = []) =>
+    request('/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    }),
+  getSuggestedPrompts: () => request('/assistant/suggestions'),
+
   // Admin & Sync
   resyncData: () => request('/admin/resync', { method: 'POST' }),
   getSyncStatus: () => request('/admin/sync-status'),

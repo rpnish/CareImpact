@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, close_db, is_in_memory
 from app.ingestion import run_ingestion
-from app.routes import members, analytics, admin
+from app.routes import members, analytics, admin, assistant
 
 # Configure logging
 logging.basicConfig(
@@ -62,6 +62,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(members.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
+app.include_router(assistant.router)
 
 @app.get("/")
 async def root():

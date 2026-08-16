@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import MemberDetail from './pages/MemberDetail';
 import StarSimulator from './pages/StarSimulator';
+import AIAssistant from './pages/AIAssistant';
 import { ToastProvider } from './components/Toast';
 import AddMemberModal from './components/AddMemberModal';
 
@@ -36,6 +37,7 @@ function AppContent() {
           />
           <Route path="/members/:id" element={<MemberDetail />} />
           <Route path="/simulator" element={<StarSimulator />} />
+          <Route path="/assistant" element={<AIAssistant />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -56,7 +58,7 @@ function AppContent() {
             <span>NCQA HEDIS MY2026</span>
           </div>
           <div className="text-[11px] text-slate-600 font-mono">
-            Single Source of Truth: <code className="text-slate-400 font-mono">/data/data.csv</code> · FastAPI + MongoDB Atlas + React
+            Single Source of Truth: <code className="text-slate-400 font-mono">/data/data.csv</code> · FastAPI + Neon PostgreSQL + Groq AI
           </div>
         </div>
       </footer>
