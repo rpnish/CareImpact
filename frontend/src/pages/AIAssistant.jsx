@@ -23,6 +23,7 @@ import {
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
+import PeekingRobot from '../components/PeekingRobot';
 
 export default function AIAssistant() {
   const toast = useToast();
@@ -508,6 +509,9 @@ export default function AIAssistant() {
           </div>
         </div>
       </div>
+
+      {/* Interactive Peeking Robot Companion */}
+      <PeekingRobot onQuickPrompt={handleSend} />
     </div>
   );
 }
