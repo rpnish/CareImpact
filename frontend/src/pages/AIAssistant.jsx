@@ -35,7 +35,7 @@ export default function AIAssistant() {
   const [suggestions, setSuggestions] = useState([]);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [lastLatency, setLastLatency] = useState(null);
-  const [lastModel, setLastModel] = useState('llama-3.3-70b-versatile');
+  const [lastModel, setLastModel] = useState('openai/gpt-oss-120b');
   const [dataSummary, setDataSummary] = useState(null);
 
   // Load suggestions on mount
@@ -246,7 +246,7 @@ export default function AIAssistant() {
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-violet-950/80 text-ai-purple-light border border-violet-800/60 shadow-glow-purple">
             <Zap className="w-3.5 h-3.5" />
-            <span>Groq LPU Llama-3.3 70B</span>
+            <span>Groq LPU ({lastModel})</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
@@ -479,7 +479,7 @@ export default function AIAssistant() {
                 <div className="w-6 h-6 rounded-lg bg-violet-500/20 flex items-center justify-center animate-spin">
                   <Sparkles className="w-3.5 h-3.5" />
                 </div>
-                <span>Groq Llama-3.3 70B reasoning over clinical dataset...</span>
+                <span>Groq AI reasoning over clinical dataset...</span>
               </motion.div>
             )}
 

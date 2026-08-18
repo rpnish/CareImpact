@@ -190,48 +190,56 @@ GUIDELINES FOR YOUR RESPONSES:
     # Add current user prompt
     messages.append({"role": "user", "content": request.message})
 
-    # Call Groq API
-    model_to_use = "llama-3.3-70b-versatile"
+    # Call Groq API with robust model fallback
+    candidate_models = []
+    for m in [settings.GROQ_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "groq/compound", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+        if m and m not in candidate_models:
+            candidate_models.append(m)
+
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {groq_key}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": model_to_use,
-        "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": 1200,
-        "top_p": 0.95
-    }
 
     start_time = time.time()
+    last_error = ""
+    last_status = 500
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, headers=headers, json=payload)
-            if resp.status_code != 200:
-                logger.error(f"Groq API error {resp.status_code}: {resp.text}")
-                # Fallback to llama-3.1-8b-instant if 70b is rate limited
-                payload["model"] = "llama-3.1-8b-instant"
-                fallback_resp = await client.post(url, headers=headers, json=payload)
-                if fallback_resp.status_code == 200:
-                    resp = fallback_resp
-                    model_to_use = "llama-3.1-8b-instant"
-                else:
-                    raise HTTPException(
-                        status_code=resp.status_code,
-                        detail=f"Groq API Error: {resp.text}"
-                    )
+            for current_model in candidate_models:
+                payload = {
+                    "model": current_model,
+                    "messages": messages,
+                    "temperature": 0.2,
+                    "max_tokens": 1200,
+                    "top_p": 0.95
+                }
+                try:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        reply = data["choices"][0]["message"]["content"]
+                        elapsed_ms = int((time.time() - start_time) * 1000)
 
-            data = resp.json()
-            reply = data["choices"][0]["message"]["content"]
-            elapsed_ms = int((time.time() - start_time) * 1000)
+                        return ChatResponse(
+                            reply=reply,
+                            model=current_model,
+                            latency_ms=elapsed_ms,
+                            data_context_summary=summary_dict
+                        )
+                    else:
+                        logger.warning(f"Groq model {current_model} failed ({resp.status_code}): {resp.text}")
+                        last_error = resp.text
+                        last_status = resp.status_code
+                except Exception as model_err:
+                    logger.warning(f"Error calling model {current_model}: {model_err}")
+                    last_error = str(model_err)
 
-            return ChatResponse(
-                reply=reply,
-                model=model_to_use,
-                latency_ms=elapsed_ms,
-                data_context_summary=summary_dict
+            raise HTTPException(
+                status_code=last_status,
+                detail=f"Groq API Error: {last_error}"
             )
 
     except httpx.TimeoutException:
@@ -239,6 +247,8 @@ GUIDELINES FOR YOUR RESPONSES:
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="Groq LLM inference timed out. Please try again."
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(
