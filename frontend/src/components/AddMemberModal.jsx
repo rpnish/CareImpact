@@ -1,398 +1,462 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, UserPlus, Sparkles, CheckCircle2, HeartPulse, Eye, Pill, Syringe } from 'lucide-react';
-import { api } from '../api/client';
+import { X, UserPlus, Sparkles, CheckCircle2, AlertOctagon, HeartPulse, Hospital, FileText, Check, Upload, Trash2, FileCheck } from 'lucide-react';
+import { useMemberStore } from '../context/MemberStoreContext';
 import { useToast } from './Toast';
+import { PLAN_DISEASE_AFFILIATIONS, CLINICAL_MEASURE_CATALOG } from '../utils/metricsEngine';
 
-const INITIAL_FORM_STATE = {
-  name: '',
-  age: 65,
-  gender: 'M',
-  city: 'Boston',
-  state: 'Massachusetts',
-  has_diabetes: false,
-  has_hypertension: false,
-  last_exam_date: '',
-  last_bp_reading: '',
-  adherence_pct: '',
-  last_flu_shot_date: '',
-};
+const COMPANIES = [
+  'Medicare',
+  'Humana',
+  'Dual Eligible',
+  'Blue Cross Blue Shield',
+  'UnitedHealthcare',
+  'Cigna Health',
+  'Medicaid',
+  'Aetna',
+  'Anthem',
+];
 
 export default function AddMemberModal({ isOpen, onClose, onMemberAdded }) {
   const toast = useToast();
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const { addNewMember } = useMemberStore();
+  const fileInputRef = useRef(null);
 
-  if (!isOpen) return null;
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [age, setAge] = useState(65);
+  const [gender, setGender] = useState('F');
+  const [birthdate, setBirthdate] = useState('');
+  const [zip, setZip] = useState('02108');
+  const [company, setCompany] = useState('Medicare');
+  const [planName, setPlanName] = useState('');
+  const [planOwnership, setPlanOwnership] = useState('GOVERNMENT');
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // Measures Initial State
+  const [measuresState, setMeasuresState] = useState({
+    CBP: 'MET',
+    HBD_C7: 'MET',
+    FVA: 'GAP',
+  });
+
+  // Attached Proof Document
+  const [attachProof, setAttachProof] = useState(false);
+  const [hospitalName, setHospitalName] = useState('');
+  const [docName, setDocName] = useState('');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFileSize, setUploadedFileSize] = useState('');
+  const [uploadedFileDataUrl, setUploadedFileDataUrl] = useState('');
+
+  // Update measures when company changes
+  const handleCompanyChange = (comp) => {
+    setCompany(comp);
+    const affiliation = PLAN_DISEASE_AFFILIATIONS[comp] || { diseases: [] };
+    const defaultMeasures = {};
+
+    affiliation.diseases.forEach((d, idx) => {
+      defaultMeasures[d.code] = idx === 0 ? 'MET' : 'GAP';
+    });
+
+    setMeasuresState(defaultMeasures);
+    setPlanName(`${comp} Quality Advantage`);
+    setPlanOwnership(comp === 'Medicare' || comp === 'Medicaid' || comp === 'Dual Eligible' ? 'GOVERNMENT' : 'PRIVATE');
   };
 
-  const handleClose = () => {
-    setFormData(INITIAL_FORM_STATE);
-    onClose();
+  const assignedDiseases = PLAN_DISEASE_AFFILIATIONS[company]?.diseases || [];
+
+  const handleMeasureChange = (code, value) => {
+    setMeasuresState((prev) => ({ ...prev, [code]: value }));
   };
 
-  // Real-time client-side preview of what the backend gap engine will evaluate
-  const computePreview = () => {
-    const gaps = [];
-    const completed = [];
+  // Real File Upload
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // Eye Exam
-    if (formData.has_diabetes) {
-      if (formData.last_exam_date && formData.last_exam_date >= '2024-08-14') {
-        completed.push('Eye Exam');
-      } else {
-        gaps.push('Eye Exam (overdue/missing)');
-      }
+    setUploadedFile(file);
+    setUploadedFileName(file.name);
+    const sizeInKb = (file.size / 1024).toFixed(1);
+    setUploadedFileSize(file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : `${sizeInKb} KB`);
+
+    if (!docName) {
+      setDocName(file.name);
     }
 
-    // BP
-    if (formData.has_hypertension) {
-      const match = formData.last_bp_reading?.match(/(\d+)\s*\/\s*(\d+)/);
-      if (match && parseInt(match[1]) < 140 && parseInt(match[2]) < 90) {
-        completed.push('BP Control');
-      } else {
-        gaps.push('BP Control (uncontrolled/missing)');
-      }
-    }
-
-    // Med adherence
-    if (formData.has_diabetes && formData.adherence_pct) {
-      if (parseFloat(formData.adherence_pct) >= 80) {
-        completed.push('Med Adherence');
-      } else {
-        gaps.push('Med Adherence (<80%)');
-      }
-    }
-
-    // Flu shot
-    if (formData.last_flu_shot_date && formData.last_flu_shot_date >= '2024-07-01') {
-      completed.push('Flu Shot');
-    } else {
-      gaps.push('Flu Vaccine (due/overdue)');
-    }
-
-    return {
-      gaps,
-      completed,
-      overallStatus: gaps.length > 0 ? 'pending' : 'completed',
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedFileDataUrl(event.target.result);
     };
+    reader.readAsDataURL(file);
+
+    toast.info(`Selected document: ${file.name}`);
   };
 
-  const preview = computePreview();
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.city.trim()) {
-      toast.error('Please provide member name and city');
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error('Please enter patient first and last name.');
       return;
     }
 
-    setLoading(true);
     try {
-      const payload = {
-        name: formData.name.trim(),
-        age: formData.age ? parseInt(formData.age) : null,
-        gender: formData.gender,
-        city: formData.city.trim(),
-        state: formData.state.trim() || 'Massachusetts',
-        has_diabetes: formData.has_diabetes,
-        has_hypertension: formData.has_hypertension,
-        last_exam_date: formData.has_diabetes && formData.last_exam_date ? formData.last_exam_date : null,
-        last_bp_reading: formData.has_hypertension && formData.last_bp_reading ? formData.last_bp_reading : null,
-        adherence_pct: formData.has_diabetes && formData.adherence_pct ? parseFloat(formData.adherence_pct) : null,
-        last_flu_shot_date: formData.last_flu_shot_date || null,
-      };
+      const proofDocs = [];
+      if (attachProof && (uploadedFileName || docName || hospitalName)) {
+        proofDocs.push({
+          id: `DOC-${Date.now()}`,
+          documentName: docName || uploadedFileName || 'Intake_Verification_Document.pdf',
+          hospitalName: hospitalName || 'Hospital / Health Center',
+          documentType: 'Clinical Intake Summary',
+          doctorName: 'Attending Physician',
+          notes: 'New member enrollment verified with electronic hospital proof.',
+          fileName: uploadedFileName || docName || 'intake_record.pdf',
+          fileSize: uploadedFileSize || '1.0 MB',
+          fileDataUrl: uploadedFileDataUrl || null,
+          uploadedAt: new Date().toISOString(),
+        });
+      }
 
-      const newMember = await api.createMember(payload);
+      const newMember = addNewMember({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        age: Number(age),
+        gender,
+        birthdate: birthdate || '1961-05-14',
+        zip: zip.trim() || '02108',
+        company,
+        planName: planName || `${company} Standard Plan`,
+        planOwnership,
+        measures: measuresState,
+        proofDocuments: proofDocs,
+      });
 
-      // Section 7 Requirement: immediate confirmation toast with detected gaps
-      const openGaps = [];
-      const m = newMember.raw_doc?.measures || {};
-      if (m.diabetic_eye_exam?.status === 'gap') openGaps.push('Eye Exam');
-      if (m.blood_pressure_control?.status === 'gap') openGaps.push('BP Control');
-      if (m.diabetes_med_adherence?.status === 'gap') openGaps.push('Med Adherence');
-      if (m.flu_vaccination?.status === 'gap') openGaps.push('Flu Shot');
+      toast.success(`Successfully enrolled ${newMember.fullName} into ${company}!`);
 
-      const gapMsg =
-        openGaps.length > 0
-          ? `Added — ${openGaps.length} open gap${openGaps.length > 1 ? 's' : ''} found: ${openGaps.join(', ')}`
-          : 'Added — All measures compliant (Completed)!';
-
-      toast.success(gapMsg);
-      
-      // Reset form fields back to blank/initial values
-      setFormData(INITIAL_FORM_STATE);
-
-      // Notify parent and broadcast event
       if (onMemberAdded) {
         onMemberAdded(newMember);
       }
-      window.dispatchEvent(new CustomEvent('medicare-member-added', { detail: newMember }));
-
       onClose();
     } catch (err) {
-      toast.error(`Failed to add member: ${err.message}`);
-    } finally {
-      setLoading(false);
+      console.error('Failed to add member:', err);
+      toast.error('Failed to add new member');
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="glass-card bg-navy-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden my-8"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-navy-850">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-teal/15 text-teal-light border border-teal/30">
-                <UserPlus className="w-5 h-5" />
-              </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-indigo-400" />
+              <span>Enroll New Member & Assign Plan Criteria</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Add a patient to the live roster with automatic NCQA HEDIS criteria evaluation.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {/* Patient Demographics */}
+          <div>
+            <span className="text-[11px] uppercase font-bold text-indigo-400 block mb-2">
+              1. Patient Demographics
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Add New Medicare Member</h3>
-                <p className="text-xs text-slate-400">Raw clinical inputs are evaluated live by the HEDIS engine</p>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Eleanor"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Vance"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                />
               </div>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Age
+                </label>
+                <input
+                  type="number"
+                  min={18}
+                  max={100}
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Gender
+                </label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono"
+                >
+                  <option value="F">Female (F)</option>
+                  <option value="M">Male (M)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Massachusetts ZIP
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 02108"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono placeholder-slate-600"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Demographics */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Member Demographics</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs text-slate-300 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Eleanor Vance"
-                    value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Age</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={formData.age}
-                    onChange={(e) => handleChange('age', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                </div>
+          {/* Insurance & Plan Assignment */}
+          <div className="pt-3 border-t border-slate-800">
+            <span className="text-[11px] uppercase font-bold text-indigo-400 block mb-2">
+              2. Insurance Company & Plan Benefit Package
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Insurance Company
+                </label>
+                <select
+                  value={company}
+                  onChange={(e) => handleCompanyChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold"
+                >
+                  {COMPANIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">Gender</label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => handleChange('gender', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                  Plan Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Medicare Quality Advantage"
+                  value={planName}
+                  onChange={(e) => setPlanName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-[11px] placeholder-slate-600"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Plan-Specific Clinical Measures */}
+          <div className="pt-3 border-t border-slate-800">
+            <span className="text-[11px] uppercase font-bold text-indigo-400 block mb-2">
+              3. Assigned Disease Criteria for {company} ({assignedDiseases.length} Measures)
+            </span>
+
+            <div className="space-y-2.5">
+              {assignedDiseases.map((d) => {
+                const currentVal = measuresState[d.code] || 'GAP';
+
+                return (
+                  <div
+                    key={d.code}
+                    className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-3"
                   >
-                    <option value="M">Male (M)</option>
-                    <option value="F">Female (F)</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">City *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Boston"
-                    value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">State</label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => handleChange('state', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                </div>
-              </div>
-            </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-white px-2 py-0.2 rounded bg-slate-900 border border-slate-800 text-[10px]">
+                          {d.code}
+                        </span>
+                        <span className="font-bold text-white text-xs">{d.diseaseName}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">({d.cmsWeight}x Weight)</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{d.measureName}</div>
+                    </div>
 
-            {/* Condition Flags */}
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Diagnosed Conditions</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  formData.has_diabetes
-                    ? 'bg-sky-500/10 border-sky-500/40 text-white'
-                    : 'bg-navy-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                }`}>
-                  <input
-                    type="checkbox"
-                    checked={formData.has_diabetes}
-                    onChange={(e) => handleChange('has_diabetes', e.target.checked)}
-                    className="w-4 h-4 rounded text-teal focus:ring-0 cursor-pointer"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold block">Type 2 Diabetes</span>
-                    <span className="text-[10px] text-slate-400">Activates Eye Exam & Med Adherence</span>
+                    <div className="flex items-center gap-1 shrink-0 font-mono">
+                      <button
+                        type="button"
+                        onClick={() => handleMeasureChange(d.code, 'MET')}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          currentVal === 'MET'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : 'text-slate-500 hover:text-white'
+                        }`}
+                      >
+                        MET
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMeasureChange(d.code, 'GAP')}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          currentVal === 'GAP'
+                            ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                            : 'text-slate-500 hover:text-white'
+                        }`}
+                      >
+                        GAP
+                      </button>
+                    </div>
                   </div>
-                </label>
+                );
+              })}
+            </div>
+          </div>
 
-                <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  formData.has_hypertension
-                    ? 'bg-sky-500/10 border-sky-500/40 text-white'
-                    : 'bg-navy-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                }`}>
-                  <input
-                    type="checkbox"
-                    checked={formData.has_hypertension}
-                    onChange={(e) => handleChange('has_hypertension', e.target.checked)}
-                    className="w-4 h-4 rounded text-teal focus:ring-0 cursor-pointer"
-                  />
+          {/* Hospital Document Proof */}
+          <div className="pt-3 border-t border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase font-bold text-indigo-400">
+                4. Initial Hospital Document Proof (Optional)
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={attachProof}
+                  onChange={(e) => setAttachProof(e.target.checked)}
+                  className="rounded border-slate-700 text-indigo-600 focus:ring-0"
+                />
+                <span className="text-slate-400 text-[11px]">Upload Document Proof</span>
+              </label>
+            </div>
+
+            {attachProof && (
+              <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                {/* File picker */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+                  className="hidden"
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-4 text-center cursor-pointer transition-all hover:bg-slate-900"
+                >
+                  {uploadedFileName ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileCheck className="w-6 h-6 text-emerald-400" />
+                      <span className="font-bold text-white text-xs">{uploadedFileName}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">({uploadedFileSize})</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploadedFile(null);
+                          setUploadedFileName('');
+                          setUploadedFileSize('');
+                          setUploadedFileDataUrl('');
+                        }}
+                        className="p-1 rounded bg-slate-800 text-slate-400 hover:text-rose-400 ml-2"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Upload className="w-6 h-6 text-slate-400 mx-auto" />
+                      <div className="text-white font-bold text-xs">Click to browse & upload medical proof file</div>
+                      <div className="text-slate-500 text-[10px] font-mono">PDF, PNG, JPG, DOCX, TXT</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <span className="text-xs font-semibold block">Essential Hypertension</span>
-                    <span className="text-[10px] text-slate-400">Activates BP Control Measure</span>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Issuing Hospital Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Mass General Brigham"
+                      value={hospitalName}
+                      onChange={(e) => setHospitalName(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs placeholder-slate-600"
+                    />
                   </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Clinical Measure Inputs */}
-            <div className="space-y-3 pt-2 border-t border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Clinical Measurements & Dates</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Eye Exam */}
-                <div className={!formData.has_diabetes ? 'opacity-40 pointer-events-none' : ''}>
-                  <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-teal-light" />
-                    Last Diabetic Eye Exam Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.last_exam_date}
-                    onChange={(e) => handleChange('last_exam_date', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">Compliant if within last 24 months (≥ 2024-08-14)</p>
-                </div>
-
-                {/* Blood Pressure */}
-                <div className={!formData.has_hypertension ? 'opacity-40 pointer-events-none' : ''}>
-                  <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
-                    <HeartPulse className="w-3.5 h-3.5 text-rose-light" />
-                    Last BP Reading (Sys/Dia)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 120/80"
-                    value={formData.last_bp_reading}
-                    onChange={(e) => handleChange('last_bp_reading', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal/50"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">Compliant if &lt;140/90 mmHg in measurement window</p>
-                </div>
-
-                {/* Adherence % */}
-                <div className={!formData.has_diabetes ? 'opacity-40 pointer-events-none' : ''}>
-                  <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
-                    <Pill className="w-3.5 h-3.5 text-sky-400" />
-                    Diabetes Med Adherence (PDC %)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    placeholder="e.g. 100.0"
-                    value={formData.adherence_pct}
-                    onChange={(e) => handleChange('adherence_pct', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal/50"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">Compliant if PDC ≥ 80%</p>
-                </div>
-
-                {/* Flu Shot */}
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1 flex items-center gap-1.5">
-                    <Syringe className="w-3.5 h-3.5 text-amber-light" />
-                    Last Flu Shot Date (All Members)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.last_flu_shot_date}
-                    onChange={(e) => handleChange('last_flu_shot_date', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-navy-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-teal/50"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">Compliant if on/after 2024-07-01</p>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Document Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Intake_Clinical_Verification.pdf"
+                      value={docName}
+                      onChange={(e) => setDocName(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-[11px] placeholder-slate-600"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Live Gap Prediction Preview */}
-            <div className="p-4 rounded-2xl bg-navy-950/90 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-light" />
-                  Live Engine Prediction:
-                </span>
-                <span className={`font-bold uppercase tracking-wider text-[11px] px-2.5 py-0.5 rounded-full ${
-                  preview.overallStatus === 'completed'
-                    ? 'bg-teal/15 text-teal-light border border-teal/30'
-                    : 'bg-rose/15 text-rose-light border border-rose/30'
-                }`}>
-                  {preview.overallStatus === 'completed' ? 'Will land in: Completed Tab' : 'Will land in: Pending Tab'}
-                </span>
-              </div>
-              <div className="text-xs text-slate-400">
-                {preview.gaps.length > 0 ? (
-                  <span className="text-rose-light">
-                    Open Gaps ({preview.gaps.length}): {preview.gaps.join(', ')}
-                  </span>
-                ) : (
-                  <span className="text-teal-light flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> No care gaps detected — member is fully compliant!
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Footer buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal disabled:opacity-50"
-              >
-                {loading ? 'Evaluating & Saving...' : 'Save & Evaluate Member'}
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl font-bold text-slate-400 hover:text-white transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>Enroll & Save Member</span>
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
   );
 }

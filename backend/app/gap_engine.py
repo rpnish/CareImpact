@@ -148,11 +148,22 @@ def evaluate_member_measures(raw_input: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-    # Classification Rule:
-    # COMPLETED: Every measure is either "compliant" or "not_eligible" (no open gap anywhere)
-    # PENDING: At least one measure is "gap"
-    has_any_gap = any(m["status"] == "gap" for m in measures.values())
-    overall_status = "pending" if has_any_gap else "completed"
+    # Priority Score Computation via CareImpact Priority Engine:
+    # Gap-free members = 0.
+    # Patients with gaps receive priority based on CMS weight (3x for CBP) and condition urgency.
+    if not has_any_gap:
+        priority_score = 0
+    else:
+        score = 0
+        if bp_status == "gap":
+            score += 55  # 3x CMS Triple Weight priority
+        if adh_status == "gap":
+            score += 30
+        if eye_status == "gap":
+            score += 25
+        if flu_status == "gap":
+            score += 15
+        priority_score = min(100, max(1, score))
 
     return {
         "conditions": {
@@ -161,5 +172,5 @@ def evaluate_member_measures(raw_input: Dict[str, Any]) -> Dict[str, Any]:
         },
         "measures": measures,
         "overallStatus": overall_status,
-        "priorityScore": 0  # placeholder as specified
+        "priorityScore": priority_score
     }

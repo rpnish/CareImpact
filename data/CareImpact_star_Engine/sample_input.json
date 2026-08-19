@@ -1,0 +1,20 @@
+{
+  "measure": {
+    "measure_id": "MEASURE_001",
+    "compliant_members": 820,
+    "eligible_members": 1000,
+    "weight": 1.0,
+    "reachability_score": 8.0,
+    "cutpoint_spread": 10.0,
+    "star_cutpoints": {
+      "1": 0.0,
+      "2": 50.0,
+      "3": 70.0,
+      "4": 80.0,
+      "5": 90.0
+    }
+  },
+  "simulation": {
+    "gaps_closed": 50
+  }
+}

@@ -1,51 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { RefreshCw, AlertCircle, Sparkles, Target, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { api } from '../api/client';
-import StarRatingHero from '../components/StarRatingHero';
-import MeasureProgressCards from '../components/MeasureProgressCards';
-import StatusDonutChart from '../components/StatusDonutChart';
-import GapBarChart from '../components/GapBarChart';
-import RatingTrendChart from '../components/RatingTrendChart';
-import GeoMapView from '../components/GeoMapView';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  Star,
+  Activity,
+  AlertTriangle,
+  AlertOctagon,
+  ArrowRight,
+  RefreshCw,
+  HeartPulse,
+  Stethoscope,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
+import { loadHierarchyFromCsv } from '../utils/hierarchyData';
+import {
+  computeStarRating,
+  getPerformanceStatus,
+  PLAN_DISEASE_AFFILIATIONS,
+  CLINICAL_MEASURE_CATALOG,
+} from '../utils/metricsEngine';
+import CompanyPlanDropdown from '../components/CompanyPlanDropdown';
+import CriteriaAnalysisCards from '../components/CriteriaAnalysisCards';
+import GeographicMapCard from '../components/GeographicMapCard';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
+import { useCompanyScope } from '../context/CompanyScopeContext';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const {
+    selectedCompanyName,
+    selectedPlanName,
+    setSelectedCompany,
+    setSelectedPlan,
+  } = useCompanyScope();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [trendData, setTrendData] = useState([]);
-  const [geoPoints, setGeoPoints] = useState([]);
-  const [priorityInfo, setPriorityInfo] = useState(null);
+  const [hierarchy, setHierarchy] = useState(null);
 
-  const fetchData = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sumRes, trendRes, geoRes, prioRes] = await Promise.all([
-        api.getAnalyticsSummary(),
-        api.getTrend(),
-        api.getGeoData(),
-        api.getPriority().catch(() => null),
-      ]);
-      setSummary(sumRes);
-      setTrendData(trendRes);
-      setGeoPoints(geoRes);
-      setPriorityInfo(prioRes);
+      const data = await loadHierarchyFromCsv('/newmembers.csv');
+      setHierarchy(data);
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-      setError(err.message || 'Failed to connect to backend server');
+      console.error('Error loading hierarchy:', err);
+      setError(err.message || 'Failed to load CSV data.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    loadData();
   }, []);
 
-  if (loading) {
+  // Handlers for dropdown selection
+  const handleSelectCompany = (company) => {
+    const compName = company ? company.companyName : 'Medicare';
+    setSelectedCompany(compName);
+  };
+
+  const handleSelectPlan = (plan) => {
+    setSelectedPlan(plan ? plan.planName : null);
+  };
+
+  // Active Company and Plan resolution
+  const activeCompany = useMemo(() => {
+    if (!hierarchy) return null;
+    return (
+      hierarchy.companies.find((c) => c.companyName === selectedCompanyName) ||
+      hierarchy.companies.find((c) => c.companyName === 'Medicare') ||
+      hierarchy.companies[0]
+    );
+  }, [hierarchy, selectedCompanyName]);
+
+  const activePlan = useMemo(() => {
+    if (!activeCompany || !selectedPlanName) return null;
+    return activeCompany.plans.find((p) => p.planName === selectedPlanName) || null;
+  }, [activeCompany, selectedPlanName]);
+
+  const activeMembers = useMemo(() => {
+    if (activePlan) return activePlan.members;
+    if (activeCompany) return activeCompany.allMembers;
+    return [];
+  }, [activeCompany, activePlan]);
+
+  const activeStarMetrics = useMemo(() => {
+    return computeStarRating(activeMembers, activeCompany?.companyName || 'Medicare');
+  }, [activeMembers, activeCompany]);
+
+  const activePerformance = useMemo(() => {
+    return getPerformanceStatus(activeStarMetrics.starPct);
+  }, [activeStarMetrics]);
+
+  // Plan Disease Affiliation Data
+  const diseaseAffiliation = useMemo(() => {
+    const compName = activeCompany?.companyName || 'Medicare';
+    return PLAN_DISEASE_AFFILIATIONS[compName] || {
+      company: compName,
+      targetPopulation: 'Enrolled Members',
+      diseases: [],
+    };
+  }, [activeCompany]);
+
+  if (loading && !hierarchy) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <SkeletonCard />
@@ -62,94 +123,213 @@ export default function Dashboard() {
     );
   }
 
-  if (error) {
+  if (error && !hierarchy) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <div className="glass-card p-8 rounded-3xl border border-rose-800/40 text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-950/60 border border-rose-800/60 text-rose-light flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-white">Dashboard Service Unavailable</h2>
+        <div className="bg-slate-900 border border-rose-800/60 rounded-3xl p-8 space-y-4">
+          <AlertOctagon className="w-10 h-10 text-rose-400 mx-auto" />
+          <h2 className="text-xl font-bold text-white">Failed to Load Dashboard Data</h2>
           <p className="text-sm text-slate-300 max-w-md mx-auto">{error}</p>
-          <p className="text-xs text-slate-500 font-mono">Ensure backend is active and reachable</p>
           <button
-            onClick={fetchData}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal"
+            onClick={loadData}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all"
           >
             <RefreshCw className="w-4 h-4" />
-            Retry Connection
+            Retry Load
           </button>
         </div>
       </div>
     );
   }
 
-  const pm = priorityInfo?.priority_measure;
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* 1. Dynamic Measure-First Priority Banner */}
-      {pm && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-4 sm:p-5 rounded-2xl border border-teal/40 bg-gradient-to-r from-teal/15 via-navy-900 to-sky-900/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-glow-teal/10"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-teal/20 text-teal-light border border-teal/40">
-              <Target className="w-6 h-6 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-teal/20 text-teal-light border border-teal/30">
-                  Dynamic CMS Priority Target #{pm.measure_priority || 1}
-                </span>
-                <span className="text-xs text-slate-400 font-mono">{pm.measure_code}</span>
-              </div>
-              <h3 className="text-sm font-bold text-white mt-1">
-                Highest Star ROI: Focus Outreach on <span className="text-teal-light">{pm.measure_name}</span>
-              </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Current performance is <strong className="text-white">{pm.current_pct}%</strong> ({pm.current_star}★). Only{' '}
-                <strong className="text-teal-light font-bold">+{pm.distance_to_target}%</strong> improvement needed to reach{' '}
-                <strong className="text-amber-light">{pm.target_pct}% ({pm.target_star}★)</strong>.
-              </p>
-            </div>
+      {/* 1. Page Title & Action */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              {activeCompany?.companyName || 'Medicare'} Quality & Clinical Intelligence
+            </h1>
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              {activeCompany?.ownershipTypes?.join(', ') || 'GOVERNMENT'}
+            </span>
           </div>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Real-time NCQA HEDIS criteria analysis, CareImpact Priority Engine rankings, and affiliated chronic disease tracking.
+          </p>
+        </div>
 
-          <Link
-            to={`/members?status=pending&measure=${pm.measure_key || 'flu_vaccination'}`}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-teal hover:bg-teal-light text-navy-950 transition-all shadow-glow-teal"
-          >
-            <span>View Prioritized Cohort</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </motion.div>
-      )}
-
-      {/* 2. Hero Star Rating & Summary */}
-      <StarRatingHero summary={summary} />
-
-      {/* 3. HEDIS Measure Progress Cards */}
-      <MeasureProgressCards measures={summary?.measures || []} />
-
-      {/* 4. Visual Analytics Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Donut Chart: Completed vs Pending */}
-        <StatusDonutChart
-          completed={summary?.completed_count || 0}
-          pending={summary?.pending_count || 0}
-        />
-
-        {/* Bar Chart: Open Gaps by Measure */}
-        <GapBarChart measures={summary?.measures || []} />
-
-        {/* Trend Area Chart: Star Rating Over Time */}
-        <RatingTrendChart trendData={trendData} />
+        <button
+          onClick={() => navigate('/members')}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm shrink-0"
+        >
+          <Users className="w-4 h-4" />
+          <span>View {activeCompany?.companyName} Prioritized Roster ({activeMembers.length})</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* 5. Geographic Map View */}
-      <GeoMapView geoPoints={geoPoints} />
+      {/* 2. Company & Plan Selector Dropdown (Shared Two-Way with Members page) */}
+      <CompanyPlanDropdown
+        hierarchy={hierarchy}
+        selectedCompanyName={activeCompany?.companyName || 'Medicare'}
+        selectedPlanName={selectedPlanName}
+        onSelectCompany={handleSelectCompany}
+        onSelectPlan={handleSelectPlan}
+      />
+
+      {/* 3. Plan-Specific KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* Star Rating Card */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              {activeCompany?.companyName} Star Rating
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+              <Star className="w-4 h-4 fill-amber-400" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-amber-400 font-mono">
+              {activeStarMetrics.starPct}%
+            </span>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono">
+              {activeStarMetrics.weightedStarValue || activeStarMetrics.starValue} ★
+            </span>
+          </div>
+          <div className="mt-2 text-xs font-semibold flex items-center gap-1.5">
+            <span className={activePerformance.textClass}>{activePerformance.label}</span>
+          </div>
+        </div>
+
+        {/* Member Population */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Enrolled Patients</span>
+            <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-white font-mono">{activeMembers.length}</span>
+            <span className="text-xs text-slate-400">members in plan</span>
+          </div>
+          <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+            <span className="text-emerald-400 font-semibold">{activeStarMetrics.gapFreeMembers} Gap-Free</span>
+            <span>·</span>
+            <span className="text-rose-400 font-semibold">{activeStarMetrics.membersWithGaps} With Gaps</span>
+          </div>
+        </div>
+
+        {/* Assigned Criteria Count */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Criteria</span>
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <Activity className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-white font-mono">{diseaseAffiliation.diseases.length}</span>
+            <span className="text-xs text-slate-400">measures evaluated</span>
+          </div>
+          <div className="mt-2 text-xs text-slate-400 font-mono">
+            {diseaseAffiliation.diseases.map((d) => d.code).join(', ') || 'None (Exempt)'}
+          </div>
+        </div>
+
+        {/* Members Requiring Outreach */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Outreach Action List</span>
+            <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-800/40 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-rose-400 font-mono">
+              {activeStarMetrics.membersWithGaps}
+            </span>
+            <span className="text-xs text-slate-400">patients with care gaps</span>
+          </div>
+          <div className="mt-2 text-xs text-slate-400">
+            Actionable clinical priority cohort
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Plan Affiliated Chronic Diseases & Measure Mapping Architecture */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="flex items-start sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <HeartPulse className="w-5 h-5 text-indigo-400" />
+              <span>{activeCompany?.companyName} Affiliated Chronic Disease & Clinical Measure Architecture</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Target clinical cohort: <span className="text-slate-200 font-medium">{diseaseAffiliation.targetPopulation}</span>.
+              Each disease is evaluated through an NCQA HEDIS criteria standard.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {diseaseAffiliation.diseases.map((item) => (
+            <div
+              key={item.code}
+              className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-indigo-900/60">
+                    {item.code}
+                  </span>
+                  <span className="text-[10px] font-mono font-semibold text-slate-400">
+                    {item.cmsWeight}x CMS Weight
+                  </span>
+                </div>
+                <h4 className="text-sm font-bold text-white mt-2 leading-snug">
+                  {item.diseaseName}
+                </h4>
+                <div className="text-xs text-slate-400 mt-0.5 font-medium">
+                  {item.measureName}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  {item.clinicalRationale}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-slate-500">Criteria Rule:</span>
+                <span className="text-slate-300 font-semibold truncate max-w-[170px]" title={CLINICAL_MEASURE_CATALOG[item.code]?.criteriaRule}>
+                  {CLINICAL_MEASURE_CATALOG[item.code]?.criteriaRule || 'Evaluation Rule'}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {diseaseAffiliation.diseases.length === 0 && (
+            <div className="col-span-full py-8 text-center text-xs text-slate-500 bg-slate-950 rounded-xl border border-slate-800">
+              <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              Uninsured cohort (NO_INSURANCE) has no payer quality rating criteria.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. Criteria-Based Quality & "Why Gaps Occur" Root Cause Analysis */}
+      <CriteriaAnalysisCards
+        members={activeMembers}
+        scopeTitle={activeCompany?.companyName || 'Medicare'}
+      />
+
+      {/* 6. Geographic Map Analysis for this specific company */}
+      <GeographicMapCard
+        members={activeMembers}
+        scopeTitle={activeCompany?.companyName || 'Medicare'}
+      />
     </div>
   );
 }
