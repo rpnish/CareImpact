@@ -4,6 +4,8 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import MemberDetail from './pages/MemberDetail';
+import StarSimulator from './pages/StarSimulator';
+import AIAssistant from './pages/AIAssistant';
 import { ToastProvider } from './components/Toast';
 import { CompanyScopeProvider } from './context/CompanyScopeContext';
 import { MemberStoreProvider } from './context/MemberStoreContext';
@@ -21,6 +23,10 @@ function AppContent() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/members" element={<Members />} />
           <Route path="/members/:id" element={<MemberDetail />} />
+          <Route path="/simulator" element={<StarSimulator />} />
+          <Route path="/simulation" element={<StarSimulator />} />
+          <Route path="/assistant" element={<AIAssistant />} />
+          <Route path="/chat" element={<AIAssistant />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

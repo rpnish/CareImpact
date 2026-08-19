@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Activity, FileSpreadsheet } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, Sliders, Bot, FileSpreadsheet } from 'lucide-react';
 
 export default function Navbar() {
   return (
@@ -23,7 +23,7 @@ export default function Navbar() {
             </div>
           </NavLink>
 
-          {/* Navigation Tabs (Only Dashboard and Members) */}
+          {/* 4 Navigation Tabs: Dashboard, Members, Star Simulator, AI Assistant */}
           <nav className="hidden sm:flex items-center gap-1.5 ml-6 pl-6 border-l border-slate-800">
             <NavLink
               to="/"
@@ -53,6 +53,34 @@ export default function Navbar() {
               <Users className="w-4 h-4 text-sky-400" />
               <span>Members Roster</span>
             </NavLink>
+
+            <NavLink
+              to="/simulator"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`
+              }
+            >
+              <Sliders className="w-4 h-4 text-amber-400" />
+              <span>Star Simulator</span>
+            </NavLink>
+
+            <NavLink
+              to="/assistant"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`
+              }
+            >
+              <Bot className="w-4 h-4 text-emerald-400" />
+              <span>AI Assistant</span>
+            </NavLink>
           </nav>
         </div>
 
@@ -73,24 +101,46 @@ export default function Navbar() {
           to="/"
           end
           className={({ isActive }) =>
-            `flex items-center gap-2 text-xs font-bold px-4 py-1.5 rounded-xl transition-all ${
+            `flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all ${
               isActive ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-400'
             }`
           }
         >
-          <LayoutDashboard className="w-4 h-4 text-indigo-400" />
+          <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
           <span>Dashboard</span>
         </NavLink>
         <NavLink
           to="/members"
           className={({ isActive }) =>
-            `flex items-center gap-2 text-xs font-bold px-4 py-1.5 rounded-xl transition-all ${
+            `flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all ${
               isActive ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-400'
             }`
           }
         >
-          <Users className="w-4 h-4 text-sky-400" />
+          <Users className="w-3.5 h-3.5 text-sky-400" />
           <span>Members</span>
+        </NavLink>
+        <NavLink
+          to="/simulator"
+          className={({ isActive }) =>
+            `flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all ${
+              isActive ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-400'
+            }`
+          }
+        >
+          <Sliders className="w-3.5 h-3.5 text-amber-400" />
+          <span>Simulator</span>
+        </NavLink>
+        <NavLink
+          to="/assistant"
+          className={({ isActive }) =>
+            `flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all ${
+              isActive ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-400'
+            }`
+          }
+        >
+          <Bot className="w-3.5 h-3.5 text-emerald-400" />
+          <span>AI Copilot</span>
         </NavLink>
       </div>
     </header>

@@ -1,27 +1,125 @@
-# CareImpact: Medicare Star Ratings & Clinical Gap-Closure Simulator
+# CareImpact: Medicare Star Ratings & Quality Gap Intelligence Platform
 
-> **A Clinical Quality Intelligence & Star Ratings Optimization Platform** for Medicare Advantage (MA) Health Plans, featuring real-time NCQA HEDIS measure evaluation, dynamic CMS cutpoint prioritization, a spring-animated Quantum Star Simulator, and a Groq-powered AI Clinical Copilot.
+> **An Enterprise Quality Intelligence & Star Ratings Optimization Engine** for Medicare Advantage (MA) and commercial health plans. Features real-time NCQA HEDIS MY2026 quality measure evaluation, dynamic CMS cutpoint prioritization, an interactive Gap Closure Star Simulator, hospital proof document verification, and a Groq-powered AI Quality Copilot.
 
 ---
 
 ## 📋 Table of Contents
-1. [Quick Start & Installation Guide](#-quick-start--installation-guide)
-2. [Full Technology Stack](#-full-technology-stack)
-3. [System Architecture](#-system-architecture)
-4. [Data Model & Schemas](#-data-model--schemas)
-5. [Clinical Quality Logic & NCQA HEDIS Engine](#-clinical-quality-logic--ncqa-hedis-engine)
-6. [Dynamic Priority & Outreach Ranking Model](#-dynamic-priority--outreach-ranking-model)
-7. [Star Rating Simulation & ROI Engine](#-star-rating-simulation--roi-engine)
-8. [AI Clinical Assistant (Groq Llama-3.3 70B)](#-ai-clinical-assistant-groq-llama-33-70b)
-9. [Backend REST API Specification](#-backend-rest-api-specification)
-10. [Frontend Application Pages & Features](#-frontend-application-pages--features)
-11. [Cloud Deployment Guide (Render & Vercel)](#-cloud-deployment-guide-render--vercel)
+1. [System Overview & Architecture](#-system-overview--architecture)
+2. [Three Engineering Roles & Tech Stacks](#-three-engineering-roles--tech-stacks)
+   - [Data Engineering](#1-data-engineering-pipeline--domain-architecture)
+   - [Backend Engineering](#2-backend-engineering-architecture)
+   - [Frontend Engineering](#3-frontend-engineering-architecture)
+3. [Quick Start & Running Commands](#-quick-start--running-commands)
+4. [The 4 Core Platform Workspaces](#-the-4-core-platform-workspaces)
+   - [1. Executive Dashboard](#1-executive-quality-dashboard-)
+   - [2. Members Roster & Profile Verification Hub](#2-members-roster--profile-verification-hub-members-membersid)
+   - [3. Star Rating Simulator](#3-star-rating-simulator-simulator)
+   - [4. AI Quality Assistant](#4-ai-quality-assistant-assistant)
+5. [Mathematical & Quality Engines](#-mathematical--quality-engines)
+   - [Star Engine & NCQA HEDIS Cutpoints](#1-star-engine--ncqa-hedis-my2026-cutpoints)
+   - [CareImpact Priority Engine & Scoring Logic](#2-careimpact-priority-engine--scoring-logic)
+6. [AI Agent Architecture & Data Ingestion Pipeline](#-ai-agent-architecture--data-ingestion-pipeline)
+7. [Backend REST API Specification](#-backend-rest-api-specification)
+8. [Production Deployment Guide](#-production-deployment-guide)
 
 ---
 
-## 🚀 Quick Start & Installation Guide
+## 🏛️ System Overview & Architecture
 
-Follow these steps to run the complete project locally on your machine.
+```
+                                  ┌────────────────────────────────────────────────────────────┐
+                                  │                     React 19 Frontend                      │
+                                  │   Dashboard  ·  Members  ·  Simulator  ·  AI Assistant     │
+                                  │   (Two-Way Company Scoping & Member Store Context)         │
+                                  └─────────────────────────────┬──────────────────────────────┘
+                                                                │
+                                                    HTTP / HTTPS REST & Direct LPU
+                                                                │
+                                                                ▼
+                                  ┌────────────────────────────────────────────────────────────┐
+                                  │                  FastAPI Backend Server                    │
+                                  │  • gap_engine.py      (NCQA HEDIS MY2026 Measure Rules)    │
+                                  │  • priority_engine.py (CMS Cutpoint Distance & Outreach)   │
+                                  │  • ingestion.py       (Multi-Company Ingestion & Schema)   │
+                                  └───────────────┬─────────────────────────────┬──────────────┘
+                                                  │                             │
+                                                  ▼                             ▼
+        ┌──────────────────────────────────────────────────┐      ┌───────────────────────────────┐
+        │            Neon PostgreSQL (Primary DB)          │      │      Groq Cloud (AI LPU)      │
+        │                                                  │      │                               │
+        │  • Members Table (Demographics, Measures, Ranks) │      │  • Model: openai/gpt-oss-120b │
+        │  • Proof Documents (Binary bytea & Base64 PDF)   │      │  • Dynamic Company RAG        │
+        │  • Dynamic Priority Scores & Clinical Dates      │      │  • Clinical Outreach Triage   │
+        └──────────────────────────────────────────────────┘      └───────────────────────────────┘
+```
+
+---
+
+## 🛠️ Three Engineering Roles & Tech Stacks
+
+### 1. Data Engineering Pipeline & Domain Architecture
+
+The Data Engineering layer manages ingestion, schema normalization, clinical rule validation, and chronic disease plan mapping.
+
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Primary Dataset** | `data/newmembers.csv` | 220 validated member records across 10 health plans (22 members/plan). |
+| **Ingestion Pipeline** | Python 3.11+, Pandas, PapaParse | Synchronizes CSV records into Neon PostgreSQL and client-side memory stores. |
+| **Clinical Standard** | NCQA HEDIS MY2026 | Encodes specifications across 9 core HEDIS quality measures. |
+| **Plan Architecture** | `PLAN_DISEASE_AFFILIATIONS` | Scopes clinical criteria and disease cohorts strictly per insurance company. |
+
+#### 🏢 10 Insurance Companies & Assigned Chronic Disease Criteria
+1. **Medicare**: Cardiovascular, Metabolic & Preventive Health (`CBP` 3x, `HBD_C7` 1x, `FVA` 1x).
+2. **Humana**: Cardiometabolic & Endocrine Management (`CBP` 3x, `HBD_C7` 1x, `SPD` 1x).
+3. **Blue Cross Blue Shield**: Preventive Oncology & Adult Wellness (`BCS` 1x, `AWV` 1x, `FVA` 1x).
+4. **Dual Eligible (Medicare/Medicaid)**: Complex Multi-Condition (`CBP` 3x, `EED` 1x, `KED` 1x, `AWV` 1x).
+5. **Anthem**: Diabetic Microvascular & Renal Health (`HBD_C7` 1x, `EED` 1x, `KED` 1x).
+6. **Aetna**: Diabetic Microvascular & Statin Therapy (`HBD_C7` 1x, `EED` 1x, `SPD` 1x).
+7. **Cigna Health**: Cardiometabolic & Renal Health (`CBP` 3x, `KED` 1x, `SPD` 1x).
+8. **Medicaid**: Preventive Women's & Adult Wellness (`BCS` 1x, `AWV` 1x, `CBP` 3x).
+9. **UnitedHealthcare**: Comprehensive Senior Care (`CBP` 3x, `AWV` 1x, `MRP` 1x).
+10. **Kaiser Permanente**: Integrated Chronic Care (`CBP` 3x, `HBD_C7` 1x, `EED` 1x).
+
+---
+
+### 2. Backend Engineering Architecture
+
+The backend delivers an asynchronous, type-safe REST API executing NCQA HEDIS evaluation, dynamic CMS cutpoint prioritization, and AI copilot routing.
+
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | **FastAPI (Python 3.12)** | Asynchronous, type-safe RESTful API with automated OpenAPI documentation. |
+| **ASGI Server** | **Uvicorn** | High-performance asynchronous server with auto-reloading. |
+| **Validation** | **Pydantic v2** | Strict input/output clinical models, request validation, and schema coercion. |
+| **Primary Relational DB** | **Neon PostgreSQL (AsyncPG)** | Serverless PostgreSQL storing members, clinical encounters, and binary PDF/image proof blobs. |
+| **Document Store** | **MongoDB Atlas (Motor)** | Optional document store for audit logging and metadata tracking. |
+| **LLM Inference Client** | **Groq Cloud API (`httpx`)** | High-speed LPU inference with multi-model fallback and strict timeout guards. |
+| **Testing** | **Pytest & Pytest-Asyncio** | Automated unit and integration tests for clinical engines and endpoints. |
+
+---
+
+### 3. Frontend Engineering Architecture
+
+The frontend is a single-page application engineered with modern dark-mode aesthetics, two-way synchronized scoping, and responsive enterprise components.
+
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | **React 19 (SPA)** | Reactive user interface built on Vite. |
+| **Build Tool** | **Vite 8.2** | Lightning-fast hot module replacement (HMR) and optimized production rollup builds. |
+| **Styling** | **Tailwind CSS v4 + Vanilla CSS** | Enterprise dark design tokens (Obsidian `#020617`, Slate `#0f172a`, Indigo `#6366f1`, Emerald `#10b981`). |
+| **Markdown Rendering** | **React-Markdown + Remark-GFM** | Renders structured GitHub Markdown tables, lists, and bold text in the AI Assistant. |
+| **Animations** | **Framer Motion** | Micro-animations, drawer transitions, and live simulation spring physics. |
+| **Data Visualization** | **Recharts** | Visual comparative dual-bar charts, Star trajectory rails, and compliance progress gauges. |
+| **Geographic Mapping** | **Leaflet & React-Leaflet** | Interactive map plotting patient coordinates, ZIP density, and regional gap clusters. |
+| **Icons** | **Lucide React** | Clinical, operational, and navigational SVG icons. |
+| **State Management** | **Context API (`useCompanyScope`, `useMemberStore`)** | Manages two-way company dropdown synchronization, gap closures, proof documents, and custom member enrollment. |
+
+---
+
+## 🚀 Quick Start & Running Commands
+
+Follow these steps to run the complete project locally.
 
 ### Prerequisites
 - **Python**: `3.10`, `3.11`, or `3.12`
@@ -39,7 +137,6 @@ cd CareImpact
 ---
 
 ### Step 2: Set Up & Start the Backend
-
 1. Navigate to the `backend` directory:
    ```bash
    cd backend
@@ -60,32 +157,27 @@ cd CareImpact
    ```
 4. Verify or create your `backend/.env` file:
    ```env
-   DATABASE_URL=postgresql://your_user:your_password@your_neon_host.neon.tech/neondb?sslmode=require
-   MONGODB_URI=mongodb+srv://your_user:your_password@cluster0.mongodb.net/?appName=Cluster0
+   DATABASE_URL=postgresql://neondb_owner:npg_4LCt3GdmzjIQ@ep-dry-heart-aytda65j.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
+   MONGODB_URI=mongodb+srv://nethrabalan05_db_user:z1YOXzFcphJbGEA4@cluster0.qmcyqzn.mongodb.net/?appName=Cluster0&tlsAllowInvalidCertificates=true
    DB_NAME=medicare_star_ratings
-   DATA_CSV_PATH=../data/data.csv
-   GROQ_API_KEY=your_groq_api_key_here
+   DATA_CSV_PATH=../data/newmembers.csv
+   GROQ_API_KEY=gsk_your_groq_api_key_here
    ```
-5. Run automated test suites:
-   ```bash
-   PYTHONPATH=. pytest tests -v
-   ```
-6. Start the FastAPI development server:
+5. Start the FastAPI development server:
    ```bash
    uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
    ```
    - **Backend API**: `http://127.0.0.1:8000`
-   - **Interactive OpenAPI / Swagger UI**: `http://127.0.0.1:8000/docs`
+   - **Interactive OpenAPI / Swagger Docs**: `http://127.0.0.1:8000/docs`
 
 ---
 
 ### Step 3: Set Up & Start the Frontend
-
 1. Open a new terminal and navigate to `frontend`:
    ```bash
    cd frontend
    ```
-2. Install npm packages:
+2. Install npm dependencies:
    ```bash
    npm install
    ```
@@ -98,197 +190,133 @@ cd CareImpact
 
 ---
 
-## 🛠️ Full Technology Stack
+## 🖥️ The 4 Core Platform Workspaces
 
-### Frontend Architecture
-| Layer | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Framework** | **React 19 (SPA)** | Ultra-fast single-page application built on Vite |
-| **Build Tool** | **Vite 8.2** | Sub-second hot module reloading (HMR) and optimized rollup production bundling |
-| **Styling** | **Tailwind CSS v4 + Vanilla CSS** | Custom Deep Space Obsidian design system (`#060814`, `#0B0F24`), Electric AI Violet (`#8B5CF6`), and Cyber Cyan tokens |
-| **Animations** | **Framer Motion** | Physics-based orbital dials, step animations, and layout transition springs |
-| **Data Visualization**| **Recharts** | Interactive SVG charts (Donut status distribution, Area star trend, Bar gap volumes, Before-vs-After comparison) |
-| **Geographic Mapping**| **Leaflet & React-Leaflet** | CartoDB Dark Matter tile layer plotting Massachusetts patient coordinates and city gap density |
-| **Icons** | **Lucide React** | Clinical, operational, and AI-themed SVG iconography |
-| **HTTP Client** | **Custom Fetch Client (`client.js`)** | Environment-aware auto-resolver detecting local (`127.0.0.1:8000`) vs. hosted (`careimpact.onrender.com`) |
+### 1. Executive Quality Dashboard (`/`)
+- **Global Payer Dropdown**: Synchronized two-way dropdown scoping metrics, enrolled members, and clinical criteria.
+- **Top KPI Cards**: Displays current plan compliance rate (%), total open gaps, gap-free members, and weighted Star rating.
+- **Plan Disease & Measure Architecture**: Displays the clinical target population, diagnosed conditions, and assigned HEDIS measures.
+- **Criteria Analysis Cards**: Live cutpoint targets (1★ to 5★), gaps needed to flip to the next Star tier, reachability %, and clinical gap rationales.
+- **Geographic Dispersion Map**: Leaflet map plotting patient locations and regional gap clusters.
 
 ---
 
-### Backend Architecture
-| Component | Technology | Purpose |
-| :--- | :--- | :--- |
-| **API Framework** | **FastAPI (Python 3.12)** | Asynchronous, type-safe RESTful API with automated OpenAPI / Swagger documentation |
-| **ASGI Server** | **Uvicorn** | High-concurrency asynchronous server with multi-worker support |
-| **Data Validation** | **Pydantic v2** | Strict input/output clinical models and schema coercion |
-| **Primary Relational DB** | **Neon PostgreSQL (AsyncPG)** | Hosted serverless PostgreSQL 18.4 storing members, conditions, HEDIS readings, and binary PDF/image storage |
-| **Document Store** | **MongoDB Atlas (Motor)** | Cloud document store for hospital proof documents, audit logs, and file metadata |
-| **LLM Inference** | **Groq Cloud API (`httpx`)** | LPU inference running `llama-3.3-70b-versatile` with <1.3s response latency |
-| **Test Framework** | **Pytest & Pytest-Asyncio** | End-to-end integration and clinical gap engine unit tests |
+### 2. Members Roster & Profile Verification Hub (`/members`, `/members/:id`)
+- **Actionable Roster Table**:
+  - Clickable member rows navigating to the full profile overview (`/members/:id`).
+  - Measures matrix displaying exact statuses (`MET` in green, `GAP` in red, `-` for non-applicable).
+  - Priority badge ($1 - 100$) derived from the CareImpact Priority Engine.
+  - Action column with **"Update"** and **"Delete"** trash buttons (with confirmation modals).
+- **"+ Enroll New Member" Modal**:
+  - Full enrollment form with demographics, insurance company selection, and auto-assigned plan criteria.
+- **Member Profile Detail Page (`/members/:id`)**:
+  - Full demographics banner, insurance plan, priority score, and assigned clinical criteria.
+  - **Gap Closure & Hospital Proof Upload**:
+    - For **`GAP`** measures: Real `<input type="file" />` picker accepting hospital documents (PDF, PNG, JPG, DOCX), recording doctor names, hospital names, clinical readings, and flipping status to `MET`.
+    - For **`MET`** measures: Displays a read-only *"Compliant · No Gap Action Needed"* indicator.
+  - **Hospital Proof Documents History**: View, download, and stream attached hospital verification documents.
 
 ---
 
-## 🏛️ System Architecture
+### 3. Star Rating Simulator (`/simulator`)
+- **Company Scoped**: Scopes strictly to the active insurance company selected in the global dropdown.
+- **Top Rating Cards**: Compares **Current Plan Baseline Rating** vs. **Simulated Projected Rating** with real-time $+\Delta \text{Stars}$ gain.
+- **Projected Star Impact Track**: Horizontal 1.0★ $\longrightarrow$ 5.0★ visual continuum rail with pin markers.
+- **Interactive Gap Closure Sliders (`Gap Closure Simulator`)**:
+  - Range sliders ($0 \longrightarrow \text{Total Gaps}$) for each assigned measure in the plan.
+  - Real-time feedback cards: Selected Gaps, Projected Compliance Rate %, Compliance Improvement %, and Star Tier Transition.
+- **Before vs After Dual-Bar Chart**: Side-by-side compliance rate comparison.
+- **Impact & Priority Analysis**: Ranked by CareImpact Priority Score with a **Highest Strategic ROI Callout** banner.
+- **Recommended Interventions**: Prioritized clinical intervention protocols (#1, #2, #3) with direct links to view the prioritized member roster.
+- **Sticky Summary Footer**: Live counter of Gaps Selected, Remaining Gaps, Projected Rating, Star Improvement, and Reset controls.
 
+---
+
+### 4. AI Quality Assistant (`/assistant`)
+- **Zero Dropdown in Chat**: Automatically inherits the globally selected insurance company without an internal selector.
+- **Company Context Injection**: Ingests active cohort size, compliance %, Star rating, open care gaps, assigned criteria, and prioritized patient records.
+- **Live Prompt Chips**: Company-specific questions (*"Who should I call first?", "Next Star Strategy", "Overview of Open Gaps"*).
+- **Clean Markdown Table Rendering**: Formats patient outreach call lists into polished GitHub Markdown tables with nurse phone scripts.
+- **Fast Groq LPU Inference**: Powered by Groq API (`openai/gpt-oss-120b`) with a 25s timeout guard and reasoning block sanitization.
+
+---
+
+## 📐 Mathematical & Quality Engines
+
+### 1. Star Engine & NCQA HEDIS MY2026 Cutpoints
+
+The Star Engine calculates measure-level and plan-level Star ratings based on official NCQA HEDIS MY2026 cutpoints:
+
+| Measure Code | Full Clinical Measure Name | Domain | CMS Weight | 1★ | 2★ | 3★ | 4★ | 5★ |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`CBP`** | Controlling High Blood Pressure ($<140/90\text{ mmHg}$) | Clinical Outcome | **$3.0\times$ (Triple)** | 0% | 53.0% | 68.0% | 75.0% | 85.0% |
+| **`HBD_C7`** | Diabetes HbA1c Poor Control ($<8.0\%$) | Clinical Outcome | $1.0\times$ | 0% | 45.0% | 60.0% | 72.0% | 84.0% |
+| **`SPD`** | Statin Therapy for Patients with Diabetes | Process / Screening | $1.0\times$ | 0% | 65.0% | 75.0% | 82.0% | 89.0% |
+| **`EED`** | Diabetic Retinal Eye Exam ($<24\text{ mo}$) | Process / Screening | $1.0\times$ | 0% | 52.0% | 65.0% | 76.0% | 88.0% |
+| **`KED`** | Kidney Health Evaluation for Diabetes | Process / Screening | $1.0\times$ | 0% | 40.0% | 55.0% | 68.0% | 80.0% |
+| **`BCS`** | Breast Cancer Screening (Mammogram) | Preventive Care | $1.0\times$ | 0% | 58.0% | 68.0% | 76.0% | 84.0% |
+| **`FVA`** | Adult Annual Flu Vaccine | Preventive Care | $1.0\times$ | 0% | 60.0% | 72.0% | 81.0% | 90.0% |
+| **`AWV`** | Annual Wellness Visit Completion | Preventive Care | $1.0\times$ | 0% | 50.0% | 65.0% | 78.0% | 88.0% |
+| **`MRP`** | Medication Reconciliation Post-Encounter | Care Coordination | $1.0\times$ | 0% | 48.0% | 62.0% | 74.0% | 86.0% |
+
+#### 🧮 Overall Plan Star Rating Formula
+$$\text{Overall Star Rating} = \frac{\sum_{m \in M} \left( \text{Star}_m \times W_m \right)}{\sum_{m \in M} W_m}$$
+
+---
+
+### 2. CareImpact Priority Engine & Scoring Logic
+
+The Priority Engine ranks members with care gaps to maximize clinical ROI and Star Rating acceleration.
+
+#### Why Patient Scores Differ for 1 Gap:
+- **Rogelio Monahan (1 Gap in `CBP` 3x)** $\longrightarrow$ **Score: `100` (Highest Priority)**.
+  - `CBP` carries a **3x CMS Triple Weight**. Closing this 1 gap immediately flips Medicare's blood pressure measure from 3★ $\rightarrow$ 4★.
+- **Benito Gulgowski (1 Gap in `FVA` 1x)** $\longrightarrow$ **Score: `78` (Moderate Priority)**.
+  - `FVA` is a **1x Standard Weight** measure, and the plan is already at 5 Stars for flu vaccines.
+- **Grisel Balistreri (0 Gaps)** $\longrightarrow$ **Score: `0` (Gap-Free / Compliant)**.
+  - Patient is fully compliant; no outreach required.
+
+#### Mathematical Formulas:
+1. **Distance to Next Cutpoint**:
+   $$D_m = S_{\text{next}} - P_m$$
+2. **Gaps Needed to Flip Star**:
+   $$G_{\text{needed}} = \left\lceil \frac{D_m}{100} \times E_m \right\rceil$$
+3. **Reachability Percentage**:
+   $$R_m = \max\left(0, \left(1 - \frac{G_{\text{needed}}}{\text{Total Gaps}_m}\right) \times 100\right)$$
+4. **Measure Strategic Priority**:
+   $$Q_m = \left( O_m \times 0.45 \right) + \left( R_m \times 0.45 \right) + \left( W_m \times 10 \times \text{WeightFactor} \right)$$
+5. **Patient Priority Score ($1 - 100$)**:
+   $$\text{Patient Priority} = \max_{m \in \text{Patient Gaps}} \left( Q_m \times \text{UrgencyMultiplier} \right)$$
+
+---
+
+## 🤖 AI Agent Architecture & Data Ingestion Pipeline
+
+### AI Agent Flow Diagram
 ```
-                                  ┌────────────────────────────────────────────────────────────┐
-                                  │                     React 19 Frontend                      │
-                                  │   Dashboard  ·  Members  ·  Simulator  ·  AI Assistant     │
-                                  └─────────────────────────────┬──────────────────────────────┘
-                                                                │
-                                                    HTTP / HTTPS REST Calls
-                                                                │
-                                                                ▼
-                                  ┌────────────────────────────────────────────────────────────┐
-                                  │                  FastAPI Backend Server                    │
-                                  │  • gap_engine.py      (NCQA HEDIS Measure Evaluator)       │
-                                  │  • priority_engine.py (Dynamic CMS Part C Ranking)         │
-                                  │  • ingestion.py       (Automatic CSV Sync & Normalization) │
-                                  └───────────────┬─────────────────────────────┬──────────────┘
-                                                  │                             │
-                                                  ▼                             ▼
-        ┌──────────────────────────────────────────────────┐      ┌───────────────────────────────┐
-        │            Neon PostgreSQL (Primary DB)          │      │      Groq Cloud (AI LPU)      │
-        │                                                  │      │                               │
-        │  • Members Table (Demographics, Measures, Ranks) │      │  • Llama-3.3 70B Versatile    │
-        │  • Proof Documents (PDF/PNG bytea & Base64)      │      │  • Live Cohort Ingestion      │
-        │  • Dynamic Priority Scores & Encounter Data      │      │  • Clinical Outreach Triage   │
-        └──────────────────────────────────────────────────┘      └───────────────────────────────┘
+  User Selects Company (e.g. Medicare / Humana)
+                      │
+                      ▼
+  Frontend Assembles Real-Time Scoped Context:
+  • Company Name & Target Population
+  • Total Enrolled Members (22) & Compliance %
+  • Current Star Rating (e.g. 3.8★) & Total Open Gaps
+  • Assigned Chronic Disease Criteria (CBP 3x, HBD_C7 1x, etc.)
+  • Prioritized Member Roster with Open Gaps & Priority Scores (1-100)
+                      │
+                      ▼
+  System Prompt Construction (Clinical Guardrails & Table Formatting)
+                      │
+                      ▼
+  Groq API Client (Endpoint: https://api.groq.com/openai/v1/chat/completions)
+  Model: openai/gpt-oss-120b | Max Tokens: 2048 | Temp: 0.2
+                      │
+                      ▼
+  Output Sanitization: Strips <think>...</think> Reasoning Blocks
+                      │
+                      ▼
+  React-Markdown + Remark-GFM: Formats Clean Dark-Theme HTML Tables & Call Scripts
 ```
-
----
-
-## 📊 Data Model & Schemas
-
-### 1. PostgreSQL `members` Table
-```sql
-CREATE TABLE members (
-    id TEXT PRIMARY KEY,                       -- Member ID (e.g. 'f9a2b3c4-...')
-    name TEXT NOT NULL,                        -- Full patient name
-    age INT NOT NULL,                          -- Patient age (e.g. 68)
-    gender TEXT NOT NULL,                      -- Gender ('M' or 'F')
-    city TEXT NOT NULL,                        -- City (e.g. 'Boston', 'Worcester')
-    state TEXT NOT NULL DEFAULT 'Massachusetts',
-    insurance_company TEXT NOT NULL,           -- Medicare Advantage PPO / HMO
-    plan_type TEXT NOT NULL DEFAULT 'Medicare Advantage',
-    has_diabetes BOOLEAN DEFAULT FALSE,        -- True if diagnosed with Type 1 or Type 2 Diabetes
-    has_hypertension BOOLEAN DEFAULT FALSE,    -- True if diagnosed with Essential Hypertension
-    eye_exam_status TEXT,                      -- 'compliant', 'gap', or 'not_eligible'
-    eye_exam_value TEXT,                       -- Last eye exam date (ISO: 'YYYY-MM-DD')
-    bp_status TEXT,                            -- 'compliant', 'gap', or 'not_eligible'
-    bp_value TEXT,                             -- Last reading (e.g. '128/82')
-    adh_status TEXT,                           -- 'compliant', 'gap', or 'not_eligible'
-    adh_value DOUBLE PRECISION,                -- Proportion of Days Covered % (e.g. 84.5)
-    flu_status TEXT,                           -- 'compliant' or 'gap'
-    flu_value TEXT,                            -- Last flu vaccine date (ISO: 'YYYY-MM-DD')
-    overall_status TEXT NOT NULL,              -- 'completed' (zero gaps) or 'pending' (>=1 gap)
-    priority_score INT DEFAULT 0,              -- Dynamic priority rank score (0 to 100)
-    reachability_score INT DEFAULT 0,          -- Encounter reachability (0 to 20)
-    reachability_label TEXT,                   -- 'High', 'Moderate', 'Low'
-    target_measure TEXT,                       -- Closest star target measure (e.g. 'flu_vaccination')
-    raw_doc JSONB,                             -- Full serialized member object with proof history
-    updated_at TEXT                            -- UTC ISO timestamp
-);
-```
-
-### 2. PostgreSQL `proof_documents` Table
-```sql
-CREATE TABLE proof_documents (
-    id TEXT PRIMARY KEY,                       -- Unique document UUID
-    member_id TEXT NOT NULL REFERENCES members(id),
-    measure_key TEXT NOT NULL,                 -- 'diabetic_eye_exam', 'blood_pressure_control', etc.
-    filename TEXT NOT NULL,                    -- Saved disk / database filename
-    original_filename TEXT NOT NULL,           -- Original uploaded filename (e.g. 'Retinal_Scan_Report.pdf')
-    file_url TEXT NOT NULL,                    -- API streaming URL: '/members/{id}/proof-documents/{doc_id}/download'
-    content_type TEXT NOT NULL,                -- 'application/pdf', 'image/png', 'image/jpeg'
-    size_bytes INT NOT NULL,                   -- Document size in bytes
-    file_data_b64 TEXT,                        -- Raw binary file stored directly in PostgreSQL
-    notes TEXT,                                -- Physician notes / hospital sign-off comments
-    uploaded_at TEXT NOT NULL                  -- UTC ISO timestamp
-);
-```
-
----
-
-## 🩺 Clinical Quality Logic & NCQA HEDIS Engine
-
-The `app/gap_engine.py` is the single clinical source of truth executing official NCQA Measurement Year 2026 specifications:
-
-```
-                                  ┌──────────────────────────────┐
-                                  │      Patient Diagnosis       │
-                                  └──────────────┬───────────────┘
-                                                 │
-                        ┌────────────────────────┼────────────────────────┐
-                        ▼                        ▼                        ▼
-               ┌────────────────┐       ┌────────────────┐       ┌────────────────┐
-               │    Diabetes    │       │  Hypertension  │       │  All Patients  │
-               └────────┬───────┘       └────────┬───────┘       └────────┬───────┘
-                        │                        │                        │
-             ┌──────────┴──────────┐             │                        │
-             ▼                     ▼             ▼                        ▼
-     ┌───────────────┐     ┌───────────────┐ ┌───────────────┐    ┌───────────────┐
-     │ Diabetic Eye  │     │ Med Adherence │ │  BP Control   │    │  Flu Vaccine  │
-     │  Exam (EED)   │     │  (PDC ≥ 80%)  │ │ (< 140/90)    │    │ (Jul 1 - Dec) │
-     └───────────────┘     └───────────────┘ └───────────────┘    └───────────────┘
-```
-
-1. **Diabetic Eye Exam (NCQA HEDIS: EED / CMS C11)**:
-   - **Eligibility**: Patient has diagnosed Diabetes (`has_diabetes == True`).
-   - **Compliance Rule**: Retinal or dilated eye exam performed within a 24-month rolling lookback (`<= 730 days`).
-   - **Status**: `compliant` if within 24 months, `gap` if overdue (>24 months) or missing, `not_eligible` if non-diabetic.
-
-2. **Controlling High Blood Pressure (NCQA HEDIS: CBP / CMS C14 - 3x TRIPLE CMS WEIGHT)**:
-   - **Eligibility**: Patient has diagnosed Hypertension (`has_hypertension == True`).
-   - **Compliance Rule**: Systolic BP `< 140 mmHg` AND Diastolic BP `< 90 mmHg` on most recent reading.
-   - **Status**: `compliant` if `< 140/90`, `gap` if `>= 140` systolic OR `>= 90` diastolic, `not_eligible` if non-hypertensive.
-
-3. **Diabetes Medication Adherence (NCQA HEDIS: PDC / CMS D11)**:
-   - **Eligibility**: Patient has diagnosed Diabetes (`has_diabetes == True`).
-   - **Compliance Rule**: Proportion of Days Covered (PDC) $\ge 80.0\%$ for oral diabetes medications.
-   - **Status**: `compliant` if `adherence_pct >= 80.0`, `gap` if `< 80.0%`, `not_eligible` if non-diabetic.
-
-4. **Annual Flu Vaccine (NCQA HEDIS: AIS-E / CMS C03)**:
-   - **Eligibility**: Universal (100% of Medicare Advantage population).
-   - **Compliance Rule**: Influenza vaccine administered between July 1 of prior year and June 30 of measurement year.
-   - **Status**: `compliant` if administered in season, `gap` if overdue.
-
----
-
-## 🎯 Dynamic Priority & Outreach Ranking Model
-
-The priority engine (`app/priority_engine.py`) continuously reads the **2026 CMS Part C Cut Points Table** and ranks members into **3 Distinct Actionable Tiers**:
-
-$$\text{Priority Score} = w_{\text{measure}} \cdot \left(1.0 - \frac{\text{Distance to Next Star}}{\text{Cutpoint Spread}}\right) \times 50 + \text{Reachability Score}$$
-
-### 3-Tier Priority Matrix
-| Priority Rank | UI Background Color | Priority Label | Description & Outreach Action |
-| :---: | :---: | :---: | :--- |
-| **Rank 3** | 🔴 **Light Red** (`bg-rose-950/30`) | **High Priority** | Member has an open gap in the **#1 Target Measure** (closest to crossing the next Star cutpoint) + High reachability score. **Call First Today**. |
-| **Rank 2** | 🟠 **Orange** (`bg-amber-950/30`) | **Medium Priority** | Member has multiple open gaps or triple-weighted BP gap. Scheduled for secondary outreach. |
-| **Rank 1** | 🔵 **Navy / Slate** (`bg-navy-950/60`) | **Normal / Low** | Member is either compliant or has low-impact gaps with extended due dates. |
-
----
-
-## 🔮 Star Rating Simulation & ROI Engine
-
-The **Quantum Star Simulator (`/simulator`)** enables healthcare executives to model exact clinical and financial outcomes before deploying care coordinators:
-
-- **CMS 4.0★ Bonus Threshold**: Medicare Advantage plans achieving $\ge 4.0$ Stars receive an extra **5% Quality Bonus Payment (QBP)** rebate from CMS (equating to millions in additional health plan revenue).
-- **Measure Weighting**:
-  - `Controlling Blood Pressure (CBP)`: **3x Weight**
-  - `Diabetic Eye Exam (EED)`: **1x Weight**
-  - `Diabetes Medication Adherence (PDC)`: **1x Weight**
-  - `Annual Flu Vaccination (AIS-E)`: **1x Weight**
-- **Live Cutpoint Analysis**: Dynamically calculates the exact number of member gap closures needed per measure to step from 3★ $\rightarrow$ 4★ $\rightarrow$ 5★.
-
----
-
-## 🤖 AI Clinical Assistant (Groq Llama-3.3 70B)
-
-The AI Assistant (`/assistant`) acts as a 24/7 Quality Director Copilot:
-- **Live Cohort RAG**: Pulls all 33 patient clinical records, diagnosed chronic conditions, last hospital encounter dates, and open gaps directly from Neon PostgreSQL into the prompt.
-- **Smart Outreach Triage**: When asked *"Who should I call first today?"*, it provides exact patient names, ages, cities, phone reachability, and custom nurse telephone scripts.
-- **Star Strategy Explainer**: Calculates exact cutpoint distances and explains the fastest path to 4.0+ Stars.
 
 ---
 
@@ -297,110 +325,51 @@ The AI Assistant (`/assistant`) acts as a 24/7 Quality Director Copilot:
 ### Members Endpoints (`/members`)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/members` | List members with optional query params (`status=pending/completed`, `measure=...`, `search=...`) with dynamic priority scoring |
-| `GET` | `/members/{id}` | Retrieve full member clinical record, conditions, and attached proof documents |
-| `POST` | `/members` | Create new member with automatic live HEDIS gap calculation |
-| `PUT` | `/members/{id}` | Update member clinical data (BP, exam dates, adherence) with real-time re-evaluation |
-| `DELETE` | `/members/{id}` | Delete member from database |
-| `POST` | `/members/{id}/proof-documents` | Upload hospital proof document (PDF/PNG/JPG) with multipart file payload |
-| `GET` | `/members/{id}/proof-documents/{doc_id}/download` | Stream and preview proof document directly from Neon PostgreSQL |
-| `DELETE` | `/members/{id}/proof-documents/{doc_id}` | Remove proof document |
+| `GET` | `/members` | List members with optional query params (`company`, `status`, `search`) and dynamic priority scores. |
+| `GET` | `/members/{id}` | Retrieve full member clinical record, conditions, and attached hospital proof documents. |
+| `POST` | `/members` | Create new member with automatic live HEDIS gap calculation. |
+| `PUT` | `/members/{id}` | Update member clinical readings (BP, dates, adherence) with real-time re-evaluation. |
+| `DELETE` | `/members/{id}` | Delete member from database. |
+| `POST` | `/members/{id}/proof-documents` | Upload hospital proof document (PDF/PNG/JPG) with multipart file payload. |
+| `GET` | `/members/{id}/proof-documents/{doc_id}/download` | Stream and download proof document from Neon PostgreSQL. |
+| `DELETE` | `/members/{id}/proof-documents/{doc_id}` | Remove proof document. |
 
 ### Analytics Endpoints (`/analytics`)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/analytics/summary` | Cohort summary: total members, completed, pending, star rating, measure compliance rates |
-| `GET` | `/analytics/trend` | Monthly Star Rating performance trajectory |
-| `GET` | `/analytics/geo` | City-level coordinates and gap volume for Massachusetts cohort mapping |
-| `GET` | `/analytics/priority` | Dynamic CMS Priority Engine target measure and outreach ranking |
+| `GET` | `/analytics/summary` | Cohort summary: total members, completed, pending, star rating, compliance rates. |
+| `GET` | `/analytics/priority` | Dynamic CMS Priority Engine target measure and outreach ranking. |
+| `GET` | `/analytics/geo` | City-level coordinates and gap volume for mapping. |
 
 ### AI Assistant Endpoints (`/assistant`)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/assistant/chat` | Groq Llama-3.3 70B chat completion with live patient context injection |
-| `GET` | `/assistant/suggestions` | Curated clinical outreach and simulation prompt cards |
-
-### Admin & Lifecycle (`/admin`, `/health`)
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/admin/resync` | Trigger manual resync from `data.csv` |
-| `GET` | `/admin/sync-status` | Ingestion status and row count audit |
-| `GET` | `/health` | Health check and database connectivity status |
+| `POST` | `/assistant/chat` | Groq AI chat completion with dynamic company context injection. |
 
 ---
 
-## 🖥️ Frontend Application Pages & Features
-
-### 1. Executive Quality Dashboard (`/`)
-- **Star Score Hero**: Displays active cohort Star Rating (`3.30 ★`) with tier badge.
-- **HEDIS Measure Progress Grid**: 4 cards showing current rate vs. 3★, 4★, and 5★ CMS cutpoints with animated status indicators.
-- **Interactive Visualizations**:
-  - Donut Chart: Pending vs. Completed cohort ratio.
-  - Bar Chart: Open gap distribution per measure.
-  - Area Chart: Star rating trend across MY2026.
-- **Massachusetts Geo Map**: Interactive Leaflet map with dark CartoDB tiles plotting patient density and gap clusters in Boston, Worcester, Springfield, and surrounding cities.
-
-### 2. Members Care Gap Management (`/members`)
-- **Two Main Tabs**: **"Pending Gaps (11)"** and **"Completed (22)"** with live badge counters.
-- **3-Tier Priority Highlighting**:
-  - High Priority (Rank 3): Light Red row background.
-  - Medium Priority (Rank 2): Orange row background.
-  - Normal Priority (Rank 1): Deep Slate row background.
-- **Filters & Search**: Instant search by name, city, ID, and condition filter (Diabetes, Hypertension).
-- **"+ Add Member" Modal**: Real-time interactive gap predictor that updates measure statuses as you type.
-
-### 3. Patient Detail & Hospital Proof Hub (`/members/:id`)
-- **Patient Banner**: Demographics, insurance plan, diagnosed conditions, and overall compliance status.
-- **Clinical Measure Breakdown**: 4 detailed cards explaining NCQA compliance criteria and last recorded readings.
-- **Hospital Proof Documents Section**:
-  - View attached PDFs, retinal scans, clinic notes, and vaccine cards.
-  - Upload new hospital documents with physician sign-off notes.
-  - Stream/preview documents directly in the browser with 1 click.
-
-### 4. Quantum Star Rating Simulator (`/simulator`)
-- **Quantum Star Reactor**: Dual orbital gauges with spring physics visualizing real-time Star Rating changes.
-- **Smart Scenario Presets**:
-  - 🚀 *Target 4.0★ Leap*: Calculates minimum gaps to hit 4.0 Stars.
-  - ⚡ *Priority #1 Max*: Closes all gaps in the top ROI measure.
-  - 👑 *5.0★ Maximum*: Models 100% gap closure across all measures.
-- **Interactive Quantum Slider Cards**: Step increment chips (`+1`, `+5`, `+10`, `Max All`, `Reset`) with CMS cutpoint notch markers.
-- **Before vs After Comparison**: Horizontal stacked bar chart visualizing simulated improvements.
-- **Floating Glassmorphic HUD Bar**: Anchored status bar with live star delta and reset controls.
-
-### 5. AI Clinical Assistant & Copilot (`/assistant`)
-- **Telemetry Bar**: Real-time status indicators for Groq LPU acceleration and Neon PostgreSQL connectivity.
-- **Live Plan Context Sidebar**: Displays current compliance metrics, open gap counts, and the #1 target measure.
-- **Quick-Start Clinical Prompts**: 1-click execution for outreach lists, cutpoint analysis, and regional queries.
-- **Markdown Chat Console**: Formatted responses with clickable member links, nurse phone scripts, and copy buttons.
-
----
-
-## ☁️ Cloud Deployment Guide (Render & Vercel)
+## ☁️ Production Deployment Guide
 
 ### Deploying Backend on Render.com
-1. Go to **[render.com](https://render.com)** $\rightarrow$ **New Web Service** $\rightarrow$ Connect `rpnish/CareImpact`.
-2. Settings:
+1. Create a new Web Service on [render.com](https://render.com) connected to your GitHub repository.
+2. Build Settings:
    - **Root Directory**: `backend`
    - **Runtime**: `Python 3`
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. Add Environment Variables:
-   - `DATABASE_URL`: Your Neon PostgreSQL connection string.
-   - `MONGODB_URI`: Your MongoDB Atlas URI.
-   - `GROQ_API_KEY`: Your Groq API key.
-   - `DATA_CSV_PATH`: `../data/data.csv`
-4. Click **Deploy**. Backend will be live at `https://careimpact-api.onrender.com`.
+3. Environment Variables:
+   - `DATABASE_URL`: Neon PostgreSQL connection string.
+   - `GROQ_API_KEY`: Your Groq API key (e.g. `gsk_...`).
+   - `DATA_CSV_PATH`: `../data/newmembers.csv`
 
-### Deploying Frontend on Vercel.com
-1. Go to **[vercel.com](https://vercel.com)** $\rightarrow$ **Add New Project** $\rightarrow$ Select `CareImpact`.
-2. Settings:
-   - **Framework Preset**: `Vite`
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-3. Click **Deploy** *(Zero environment variables required — auto-detects cloud backend)*.
+### Deploying Frontend on Vercel
+1. Import the repository on [vercel.com](https://vercel.com).
+2. Framework Preset: `Vite`.
+3. Root Directory: `frontend`.
+4. Build Command: `npm run build`, Output Directory: `dist`.
+5. Deploy.
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License for the Medicare Advantage Quality Innovation Hackathon.
+Licensed under the MIT License.
