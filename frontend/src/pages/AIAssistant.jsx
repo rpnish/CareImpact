@@ -266,99 +266,103 @@ CRITICAL FORMATTING & CLINICAL RULES:
 6. Use clean Markdown headings (###), bold highlights (**text**), and bullet lists.`;
 
     try {
-      // 1. Try Backend /assistant/chat endpoint
-      const backendResp = await fetch('http://127.0.0.1:8000/assistant/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: msg,
-          history: messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
-          company_name: companyClinicalContext.companyName,
-          company_context: {
-            totalMembers: companyClinicalContext.totalMembers,
-            compliancePct: companyClinicalContext.compliancePct,
-            starRating: companyClinicalContext.starRating,
-            totalGaps: companyClinicalContext.gapCount,
-            criteriaSummary: companyClinicalContext.criteriaSummary,
-            prioritizedPatients: companyClinicalContext.prioritizedPatients,
-          },
-        }),
-        signal: controller.signal,
-      });
+      // 1. Try Backend /assistant/chat endpoint first
+      let resolved = false;
+      try {
+        const backendResp = await fetch('http://127.0.0.1:8000/assistant/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            history: messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
+            company_name: companyClinicalContext.companyName,
+            company_context: {
+              totalMembers: companyClinicalContext.totalMembers,
+              compliancePct: companyClinicalContext.compliancePct,
+              starRating: companyClinicalContext.starRating,
+              totalGaps: companyClinicalContext.gapCount,
+              criteriaSummary: companyClinicalContext.criteriaSummary,
+              prioritizedPatients: companyClinicalContext.prioritizedPatients,
+            },
+          }),
+          signal: controller.signal,
+        });
 
-      if (backendResp.ok) {
+        if (backendResp.ok) {
+          clearTimeout(timeoutId);
+          const data = await backendResp.json();
+          const rawReply = data.reply || 'No response received.';
+          const cleanReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+          const latency = data.latency_ms || (Date.now() - startTime);
+
+          setMessages([
+            ...newHistory,
+            {
+              role: 'assistant',
+              content: cleanReply || rawReply,
+              model: data.model || 'openai/gpt-oss-120b',
+              latency_ms: latency,
+            },
+          ]);
+          setLastLatency(latency);
+          setLastModel(data.model || 'openai/gpt-oss-120b');
+          resolved = true;
+        }
+      } catch (backendErr) {
+        console.warn('Backend assistant endpoint call failed, attempting direct Groq API fallback:', backendErr);
+      }
+
+      // 2. Direct call to Groq API if backend wasn't resolved
+      if (!resolved) {
+        if (!GROQ_API_KEY) {
+          throw new Error('Backend assistant server is unreachable. Please verify backend is running on port 8000.');
+        }
+
+        const groqPayload = {
+          model: 'openai/gpt-oss-120b',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
+            { role: 'user', content: msg },
+          ],
+          temperature: 0.2,
+          max_tokens: 2048,
+        };
+
+        const groqResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(groqPayload),
+          signal: controller.signal,
+        });
+
         clearTimeout(timeoutId);
-        const data = await backendResp.json();
-        const rawReply = data.reply || 'No response received.';
+
+        if (!groqResp.ok) {
+          const errText = await groqResp.text();
+          throw new Error(`Groq API (${groqResp.status}): ${errText}`);
+        }
+
+        const groqData = await groqResp.json();
+        const rawReply = groqData.choices?.[0]?.message?.content || 'No response received.';
         const cleanReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-        const latency = data.latency_ms || (Date.now() - startTime);
+        const latency = Date.now() - startTime;
 
         setMessages([
           ...newHistory,
           {
             role: 'assistant',
             content: cleanReply || rawReply,
-            model: data.model || 'openai/gpt-oss-120b',
+            model: 'openai/gpt-oss-120b',
             latency_ms: latency,
           },
         ]);
         setLastLatency(latency);
-        setLastModel(data.model || 'openai/gpt-oss-120b');
-        return;
+        setLastModel('openai/gpt-oss-120b');
       }
-    } catch (backendErr) {
-      console.warn('Backend assistant endpoint call failed, attempting direct Groq API fallback:', backendErr);
-    }
-
-    try {
-      // 2. Direct call to Groq API if key is provided via VITE_GROQ_API_KEY
-      if (!GROQ_API_KEY) {
-        throw new Error('Backend unavailable and VITE_GROQ_API_KEY not configured.');
-      }
-      const groqPayload = {
-        model: 'openai/gpt-oss-120b',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: msg },
-        ],
-        temperature: 0.2,
-        max_tokens: 2048,
-      };
-
-      const groqResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(groqPayload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!groqResp.ok) {
-        const errText = await groqResp.text();
-        throw new Error(`Groq API (${groqResp.status}): ${errText}`);
-      }
-
-      const groqData = await groqResp.json();
-      const rawReply = groqData.choices?.[0]?.message?.content || 'No response received.';
-      const cleanReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-      const latency = Date.now() - startTime;
-
-      setMessages([
-        ...newHistory,
-        {
-          role: 'assistant',
-          content: cleanReply || rawReply,
-          model: 'openai/gpt-oss-120b',
-          latency_ms: latency,
-        },
-      ]);
-      setLastLatency(latency);
-      setLastModel('openai/gpt-oss-120b');
     } catch (err) {
       clearTimeout(timeoutId);
       console.error('Groq AI inference error:', err);
