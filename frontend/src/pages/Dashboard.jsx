@@ -20,6 +20,8 @@ import {
   Award,
   Sparkles,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   MapPin,
   CheckCircle2,
   PhoneCall,
@@ -28,6 +30,7 @@ import {
   Building2,
   Calendar,
   Eye,
+  Info,
 } from 'lucide-react';
 import { loadHierarchyFromCsv } from '../utils/hierarchyData';
 import {
@@ -40,11 +43,12 @@ import {
   findNextStar,
 } from '../utils/metricsEngine';
 import CompanyPlanDropdown from '../components/CompanyPlanDropdown';
-import CriteriaAnalysisCards from '../components/CriteriaAnalysisCards';
 import GeographicMapCard from '../components/GeographicMapCard';
 import { SkeletonCard, SkeletonChart } from '../components/Skeleton';
 import { useCompanyScope } from '../context/CompanyScopeContext';
 import { useMemberStore } from '../context/MemberStoreContext';
+
+const ALL_MEASURE_CODES = ['CBP', 'HBD_C7', 'EED', 'SPD', 'KED', 'BCS', 'FVA', 'AWV', 'MRP'];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -63,7 +67,8 @@ export default function Dashboard() {
     deletedMemberIds,
   } = useMemberStore();
 
-  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'CARDIO' | 'DIABETES' | 'PREVENTIVE'
+  const [viewMode, setViewMode] = useState('ASSIGNED_ONLY'); // 'ASSIGNED_ONLY' | 'ALL_CATALOG'
+  const [expandedCode, setExpandedCode] = useState(null);
 
   // Handlers for dropdown selection
   const handleSelectCompany = (company) => {
@@ -170,9 +175,15 @@ export default function Dashboard() {
     return diseaseAffiliation.diseases.map((d) => d.code);
   }, [diseaseAffiliation]);
 
-  // Detailed measure calculation matrix for this plan
+  // Codes to display in matrix based on view toggle
+  const codesToDisplay = useMemo(() => {
+    if (viewMode === 'ALL_CATALOG') return ALL_MEASURE_CODES;
+    return assignedCodes.length > 0 ? assignedCodes : ALL_MEASURE_CODES;
+  }, [viewMode, assignedCodes]);
+
+  // Detailed measure calculation matrix
   const planMeasureMatrix = useMemo(() => {
-    const maxGaps = Math.max(1, ...assignedCodes.map((code) => {
+    const maxGaps = Math.max(1, ...codesToDisplay.map((code) => {
       let g = 0;
       activeMembers.forEach((m) => {
         if (m.measures?.[code] === 'GAP') g++;
@@ -180,7 +191,7 @@ export default function Dashboard() {
       return g;
     }));
 
-    return assignedCodes.map((code) => {
+    return codesToDisplay.map((code) => {
       let compliant = 0;
       let gaps = 0;
       activeMembers.forEach((m) => {
@@ -195,6 +206,7 @@ export default function Dashboard() {
       const prio = evaluateMeasurePriority(eligible, compliant, code, maxGaps);
       const cutpoints = CMS_MEASURE_CUTPOINTS[code] || { 1: 0, 2: 50, 3: 65, 4: 75, 5: 85 };
       const nextInfo = findNextStar(rate, cutpoints);
+      const isAssigned = assignedCodes.includes(code) || eligible > 0;
 
       return {
         code,
@@ -205,6 +217,7 @@ export default function Dashboard() {
         compliant,
         gaps,
         rate,
+        isAssigned,
         currentStar: prio.currentStar,
         nextStar: nextInfo.nextStar,
         nextCutpoint: nextInfo.nextCutpoint,
@@ -216,7 +229,7 @@ export default function Dashboard() {
         whyGapsOccur: info?.whyGapsOccur,
       };
     }).sort((a, b) => b.priorityScore - a.priorityScore);
-  }, [assignedCodes, activeMembers]);
+  }, [codesToDisplay, assignedCodes, activeMembers]);
 
   // Top prioritized members with open care gaps
   const prioritizedPatientsQueue = useMemo(() => {
@@ -227,7 +240,9 @@ export default function Dashboard() {
   }, [activeMembers]);
 
   // Highest strategic ROI measure (top weighted priority)
-  const highestRoiMeasure = planMeasureMatrix[0] || null;
+  const highestRoiMeasure = useMemo(() => {
+    return planMeasureMatrix.find((m) => m.isAssigned) || planMeasureMatrix[0] || null;
+  }, [planMeasureMatrix]);
 
   if (storeLoading && !hierarchy) {
     return (
@@ -243,7 +258,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* ========================================================================= */}
       {/* 1. TOP EXECUTIVE COMMAND BAR & PLAN SELECTOR */}
       {/* ========================================================================= */}
@@ -309,13 +324,13 @@ export default function Dashboard() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. ASYMMETRIC BENTO GRID: LEFT COLUMN (65%) & RIGHT SIDEBAR (35%) */}
+      {/* 2. SEAMLESS ASYMMETRIC BENTO GRID: LEFT (65%) & RIGHT SIDEBAR (35%)       */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* ===================================================================== */}
         {/* LEFT COLUMN: 8 COLS (66.6%) - CLINICAL PERFORMANCE & MEASURE MATRIX   */}
         {/* ===================================================================== */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
           {/* Bento Card 1: CMS Star Rating Performance Hub */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs relative overflow-hidden">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -380,133 +395,208 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Bento Card 2: Structured Clinical Measure Matrix Table */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-blue-600" />
-                  <span>Assigned Quality Measures Matrix ({planMeasureMatrix.length})</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Real-time NCQA HEDIS criteria compliance, Star reachability, and CareImpact priority rankings.
-                </p>
+          {/* Bento Card 2: Interactive Clinical Measure & Root-Cause Matrix */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-blue-600" />
+                    <span>Clinical Quality & Gap Root-Cause Matrix ({planMeasureMatrix.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Live NCQA HEDIS criteria rules, next-Star cutpoint reachability, and root-cause analysis.
+                  </p>
+                </div>
+
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                  <button
+                    onClick={() => setViewMode('ASSIGNED_ONLY')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      viewMode === 'ASSIGNED_ONLY'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Assigned ({assignedCodes.length})
+                  </button>
+                  <button
+                    onClick={() => setViewMode('ALL_CATALOG')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      viewMode === 'ALL_CATALOG'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    All Catalog (9)
+                  </button>
+                </div>
               </div>
 
-              <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
-                {diseaseAffiliation.targetPopulation}
-              </span>
+              {/* High-Density Matrix Table */}
+              <div className="overflow-x-auto mt-2">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-500">
+                      <th className="py-2.5 px-3 font-semibold">Measure / Protocol</th>
+                      <th className="py-2.5 px-2 font-semibold text-center">Weight</th>
+                      <th className="py-2.5 px-3 font-semibold">Compliance Rate</th>
+                      <th className="py-2.5 px-2 font-semibold text-center">Gaps</th>
+                      <th className="py-2.5 px-3 font-semibold text-center">Next Star Leap</th>
+                      <th className="py-2.5 px-2 font-semibold text-center">Priority</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {planMeasureMatrix.map((item) => {
+                      const isTriple = item.cmsWeight >= 3;
+                      const isExpanded = expandedCode === item.code;
+
+                      return (
+                        <React.Fragment key={item.code}>
+                          <tr
+                            onClick={() => setExpandedCode(isExpanded ? null : item.code)}
+                            className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                          >
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px]">
+                                  {item.code}
+                                </span>
+                                <div>
+                                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span>{item.name}</span>
+                                    {!item.isAssigned && (
+                                      <span className="text-[9px] font-mono text-slate-400 font-normal">
+                                        (Not in Plan)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 font-normal">{item.domain}</div>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-2 text-center font-mono">
+                              {isTriple ? (
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10px]">
+                                  3x Triple
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 font-medium text-[11px]">
+                                  {item.cmsWeight}x
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3 min-w-[130px]">
+                              {item.eligible > 0 ? (
+                                <div className="space-y-1">
+                                  <div className="flex justify-between font-mono text-[11px]">
+                                    <span className="font-bold text-slate-900">{item.rate}%</span>
+                                    <span className="text-slate-500">{item.compliant}/{item.eligible}</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden flex border border-slate-200">
+                                    <div style={{ width: `${item.rate}%` }} className="bg-emerald-500 h-full rounded-full" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-[11px]">N/A</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-2 text-center font-mono font-bold text-rose-600">
+                              {item.eligible > 0 ? item.gaps : '—'}
+                            </td>
+
+                            <td className="py-3 px-3 text-center font-mono text-[11px]">
+                              {item.eligible > 0 ? (
+                                item.nextStar ? (
+                                  <span className="text-blue-700 font-semibold" title={`Need ${item.gapsNeeded} more gap closures for ${item.nextStar}★`}>
+                                    {item.nextStar}★ <span className="text-slate-400">({item.gapsNeeded} needed)</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 font-semibold">5★ Top Tier</span>
+                                )
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-2 text-center font-mono">
+                              {item.eligible > 0 ? (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                  item.priorityScore >= 75
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {item.priorityScore}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">0</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                type="button"
+                                className="p-1 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                              >
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Expandable Root Cause & Action Protocol Row */}
+                          {isExpanded && (
+                            <tr className="bg-blue-50/20">
+                              <td colSpan={7} className="p-4 border-b border-slate-200">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                                    <span className="font-bold text-rose-600 uppercase text-[10px] tracking-wider block">
+                                      Why Gap Occurs (Root Cause):
+                                    </span>
+                                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                                      {item.whyGapsOccur}
+                                    </p>
+                                  </div>
+                                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                                    <span className="font-bold text-blue-700 uppercase text-[10px] tracking-wider block">
+                                      Recommended Clinical Outreach Action:
+                                    </span>
+                                    <p className="text-slate-700 text-[11px] leading-relaxed">
+                                      {item.clinicalAction}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* Matrix Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-500">
-                    <th className="py-2.5 px-3 font-semibold">Measure / Disease</th>
-                    <th className="py-2.5 px-2 font-semibold text-center">Weight</th>
-                    <th className="py-2.5 px-3 font-semibold">Compliance Rate</th>
-                    <th className="py-2.5 px-2 font-semibold text-center">Gaps</th>
-                    <th className="py-2.5 px-3 font-semibold text-center">Next Star Leap</th>
-                    <th className="py-2.5 px-2 font-semibold text-center">Priority</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {planMeasureMatrix.map((item) => {
-                    const isTriple = item.cmsWeight >= 3;
-                    return (
-                      <tr key={item.code} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px]">
-                              {item.code}
-                            </span>
-                            <div>
-                              <div className="font-bold text-slate-900">{item.name}</div>
-                              <div className="text-[11px] text-slate-500 font-normal">{item.domain}</div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-2 text-center font-mono">
-                          {isTriple ? (
-                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10px]">
-                              3x Triple
-                            </span>
-                          ) : (
-                            <span className="text-slate-600 font-medium text-[11px]">
-                              {item.cmsWeight}x
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3 min-w-[130px]">
-                          <div className="space-y-1">
-                            <div className="flex justify-between font-mono text-[11px]">
-                              <span className="font-bold text-slate-900">{item.rate}%</span>
-                              <span className="text-slate-500">{item.compliant}/{item.eligible}</span>
-                            </div>
-                            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden flex border border-slate-200">
-                              <div style={{ width: `${item.rate}%` }} className="bg-emerald-500 h-full rounded-full" />
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-2 text-center font-mono font-bold text-rose-600">
-                          {item.gaps}
-                        </td>
-
-                        <td className="py-3 px-3 text-center font-mono text-[11px]">
-                          {item.nextStar ? (
-                            <span className="text-blue-700 font-semibold" title={`Need ${item.gapsNeeded} more gap closures for ${item.nextStar}★`}>
-                              {item.nextStar}★ <span className="text-slate-400">({item.gapsNeeded} needed)</span>
-                            </span>
-                          ) : (
-                            <span className="text-emerald-700 font-semibold">5★ Top Tier</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-2 text-center font-mono">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            item.priorityScore >= 75
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            {item.priorityScore}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() => navigate('/members')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all shadow-2xs"
-                          >
-                            <span>Gaps</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {planMeasureMatrix.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
-                        No quality measures assigned to this plan cohort.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+              <span>Click on any measure row to view clinical action plans and root causes.</span>
+              <button
+                onClick={() => navigate('/members')}
+                className="text-blue-600 font-bold hover:underline"
+              >
+                Inspect All Members in Roster →
+              </button>
             </div>
           </div>
         </div>
 
         {/* ===================================================================== */}
-        {/* RIGHT COLUMN: 4 COLS (33.3%) - ACTIONABLE QUEUE & EXECUTIVE SIDEBAR   */}
+        {/* RIGHT COLUMN: 4 COLS (33.3%) - ACTIONABLE QUEUE & STRATEGIC SIDEBAR   */}
         {/* ===================================================================== */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-4 flex flex-col justify-between space-y-6">
           {/* Sidebar Card 1: Urgent Nurse Outreach Queue */}
           <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -619,16 +709,9 @@ export default function Dashboard() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. FULL-WIDTH LOWER BENTO SECTION: CRITERIA ROOT-CAUSE EXPLORER & MAP */}
+      {/* 3. FULL-WIDTH LOWER BENTO SECTION: GEOGRAPHIC REGIONAL HEATMAP MAP        */}
       {/* ========================================================================= */}
-      <div className="space-y-6">
-        {/* Criteria-Based Quality & "Why Gaps Occur" Root Cause Analysis */}
-        <CriteriaAnalysisCards
-          members={activeMembers}
-          scopeTitle={activeCompany?.companyName || 'Medicare'}
-        />
-
-        {/* Geographic Map Analysis for this specific company */}
+      <div>
         <GeographicMapCard
           members={activeMembers}
           scopeTitle={activeCompany?.companyName || 'Medicare'}
