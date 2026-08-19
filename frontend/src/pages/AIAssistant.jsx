@@ -266,7 +266,55 @@ CRITICAL FORMATTING & CLINICAL RULES:
 6. Use clean Markdown headings (###), bold highlights (**text**), and bullet lists.`;
 
     try {
-      // Direct call to Groq API with fast models
+      // 1. Try Backend /assistant/chat endpoint
+      const backendResp = await fetch('http://127.0.0.1:8000/assistant/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          history: messages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
+          company_name: companyClinicalContext.companyName,
+          company_context: {
+            totalMembers: companyClinicalContext.totalMembers,
+            compliancePct: companyClinicalContext.compliancePct,
+            starRating: companyClinicalContext.starRating,
+            totalGaps: companyClinicalContext.gapCount,
+            criteriaSummary: companyClinicalContext.criteriaSummary,
+            prioritizedPatients: companyClinicalContext.prioritizedPatients,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      if (backendResp.ok) {
+        clearTimeout(timeoutId);
+        const data = await backendResp.json();
+        const rawReply = data.reply || 'No response received.';
+        const cleanReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        const latency = data.latency_ms || (Date.now() - startTime);
+
+        setMessages([
+          ...newHistory,
+          {
+            role: 'assistant',
+            content: cleanReply || rawReply,
+            model: data.model || 'openai/gpt-oss-120b',
+            latency_ms: latency,
+          },
+        ]);
+        setLastLatency(latency);
+        setLastModel(data.model || 'openai/gpt-oss-120b');
+        return;
+      }
+    } catch (backendErr) {
+      console.warn('Backend assistant endpoint call failed, attempting direct Groq API fallback:', backendErr);
+    }
+
+    try {
+      // 2. Direct call to Groq API if key is provided via VITE_GROQ_API_KEY
+      if (!GROQ_API_KEY) {
+        throw new Error('Backend unavailable and VITE_GROQ_API_KEY not configured.');
+      }
       const groqPayload = {
         model: 'openai/gpt-oss-120b',
         messages: [
