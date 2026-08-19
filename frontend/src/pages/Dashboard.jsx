@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   Star,
@@ -19,6 +20,14 @@ import {
   Award,
   Sparkles,
   ChevronRight,
+  MapPin,
+  CheckCircle2,
+  PhoneCall,
+  Target,
+  Layers,
+  Building2,
+  Calendar,
+  Eye,
 } from 'lucide-react';
 import { loadHierarchyFromCsv } from '../utils/hierarchyData';
 import {
@@ -27,6 +36,8 @@ import {
   PLAN_DISEASE_AFFILIATIONS,
   CLINICAL_MEASURE_CATALOG,
   CMS_MEASURE_CUTPOINTS,
+  evaluateMeasurePriority,
+  findNextStar,
 } from '../utils/metricsEngine';
 import CompanyPlanDropdown from '../components/CompanyPlanDropdown';
 import CriteriaAnalysisCards from '../components/CriteriaAnalysisCards';
@@ -52,8 +63,7 @@ export default function Dashboard() {
     deletedMemberIds,
   } = useMemberStore();
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'CARDIO' | 'DIABETES' | 'PREVENTIVE'
 
   // Handlers for dropdown selection
   const handleSelectCompany = (company) => {
@@ -155,10 +165,69 @@ export default function Dashboard() {
     };
   }, [activeCompany]);
 
-  // High priority gap members (Priority >= 75)
-  const highPriorityCount = useMemo(() => {
-    return activeMembers.filter((m) => m.hasCareGap && (m.priority || 0) >= 75).length;
+  // Assigned measure codes
+  const assignedCodes = useMemo(() => {
+    return diseaseAffiliation.diseases.map((d) => d.code);
+  }, [diseaseAffiliation]);
+
+  // Detailed measure calculation matrix for this plan
+  const planMeasureMatrix = useMemo(() => {
+    const maxGaps = Math.max(1, ...assignedCodes.map((code) => {
+      let g = 0;
+      activeMembers.forEach((m) => {
+        if (m.measures?.[code] === 'GAP') g++;
+      });
+      return g;
+    }));
+
+    return assignedCodes.map((code) => {
+      let compliant = 0;
+      let gaps = 0;
+      activeMembers.forEach((m) => {
+        const val = m.measures?.[code];
+        if (val === 'MET') compliant++;
+        else if (val === 'GAP') gaps++;
+      });
+
+      const eligible = compliant + gaps;
+      const rate = eligible > 0 ? Math.round((compliant / eligible) * 1000) / 10 : 0;
+      const info = CLINICAL_MEASURE_CATALOG[code];
+      const prio = evaluateMeasurePriority(eligible, compliant, code, maxGaps);
+      const cutpoints = CMS_MEASURE_CUTPOINTS[code] || { 1: 0, 2: 50, 3: 65, 4: 75, 5: 85 };
+      const nextInfo = findNextStar(rate, cutpoints);
+
+      return {
+        code,
+        name: info?.name || code,
+        domain: info?.domain || 'Clinical Care',
+        cmsWeight: info?.cmsWeight || 1,
+        eligible,
+        compliant,
+        gaps,
+        rate,
+        currentStar: prio.currentStar,
+        nextStar: nextInfo.nextStar,
+        nextCutpoint: nextInfo.nextCutpoint,
+        gapsNeeded: prio.gapsNeededForNextStar,
+        reachabilityPct: prio.reachabilityPct,
+        priorityScore: prio.priorityScore,
+        clinicalAction: info?.clinicalAction,
+        criteriaRule: info?.criteriaRule,
+        whyGapsOccur: info?.whyGapsOccur,
+      };
+    }).sort((a, b) => b.priorityScore - a.priorityScore);
+  }, [assignedCodes, activeMembers]);
+
+  // Top prioritized members with open care gaps
+  const prioritizedPatientsQueue = useMemo(() => {
+    return activeMembers
+      .filter((m) => m.hasCareGap)
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+      .slice(0, 6);
   }, [activeMembers]);
+
+  // Highest strategic ROI measure (top weighted priority)
+  const highestRoiMeasure = planMeasureMatrix[0] || null;
 
   if (storeLoading && !hierarchy) {
     return (
@@ -169,53 +238,49 @@ export default function Dashboard() {
             <SkeletonCard key={i} />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SkeletonChart />
-          <SkeletonChart />
-        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* 1. Executive Summary Command Bar */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+      {/* ========================================================================= */}
+      {/* 1. TOP EXECUTIVE COMMAND BAR & PLAN SELECTOR */}
+      {/* ========================================================================= */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>LIVE COHORT SYNC · NCQA HEDIS MY2026</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>NCQA HEDIS MY2026 AUDIT COMPLIANT</span>
               </span>
-              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                 {activeCompany?.ownershipTypes?.join(', ') || 'GOVERNMENT'}
+              </span>
+              <span className="text-[11px] font-mono text-slate-500">
+                {activeMembers.length} Enrolled Members · {activeStarMetrics.totalGaps || activeStarMetrics.gapCount || 0} Open Gaps
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-2 flex items-center gap-3">
-              <span>{activeCompany?.companyName || 'Medicare'} Quality & Clinical Intelligence</span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1.5">
+              {activeCompany?.companyName || 'Medicare'} Quality & Clinical Intelligence Center
             </h1>
-
-            <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
-              Executive performance monitoring, real-time NCQA HEDIS criteria analysis, CareImpact Priority Engine rankings, and affiliated chronic disease gap closure.
-            </p>
           </div>
 
           {/* Quick Action Navigation Hub */}
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             <button
               onClick={() => navigate('/members')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs"
             >
               <Users className="w-4 h-4" />
               <span>Prioritized Roster ({activeMembers.length})</span>
-              <ArrowRight className="w-4 h-4" />
             </button>
 
             <button
               onClick={() => navigate('/simulator')}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all"
             >
               <Sliders className="w-4 h-4 text-amber-500" />
               <span>Star Simulator</span>
@@ -223,7 +288,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => navigate('/assistant')}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all"
             >
               <Bot className="w-4 h-4 text-emerald-600" />
               <span>AI Copilot</span>
@@ -231,8 +296,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Company & Plan Selector Dropdown Bar */}
-        <div className="pt-4 border-t border-slate-100">
+        {/* Unified Company & Plan Selector Dropdown */}
+        <div className="pt-3 border-t border-slate-100">
           <CompanyPlanDropdown
             hierarchy={hierarchy}
             selectedCompanyName={activeCompany?.companyName || 'Medicare'}
@@ -243,233 +308,332 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2. Executive KPI Bento Grid (4 High-Density Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {/* Card 1: Star Rating */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono">
-                CMS Star Rating (MY2026)
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shadow-2xs">
-                <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+      {/* ========================================================================= */}
+      {/* 2. ASYMMETRIC BENTO GRID: LEFT COLUMN (65%) & RIGHT SIDEBAR (35%) */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ===================================================================== */}
+        {/* LEFT COLUMN: 8 COLS (66.6%) - CLINICAL PERFORMANCE & MEASURE MATRIX   */}
+        {/* ===================================================================== */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Bento Card 1: CMS Star Rating Performance Hub */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-slate-500 font-mono block">
+                  CMS Star Rating Scorecard
+                </span>
+                <h2 className="text-lg font-bold text-slate-900 mt-0.5 flex items-center gap-2">
+                  <span>{activeCompany?.companyName} Performance Rating</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                    {activeStarMetrics.weightedStarValue || activeStarMetrics.starValue} ★ Tier
+                  </span>
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Compliance</span>
+                  <span className="text-xl font-black text-slate-900 font-mono">{activeStarMetrics.starPct}%</span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 border border-amber-200 flex items-center justify-center font-bold text-lg shadow-2xs">
+                  ★
+                </div>
               </div>
             </div>
 
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900 font-mono">
-                {activeStarMetrics.starPct}%
-              </span>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-mono">
-                {activeStarMetrics.weightedStarValue || activeStarMetrics.starValue} ★ Tier
-              </span>
+            {/* Visual Star continuum rail */}
+            <div className="pt-4 space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-slate-600 font-semibold">Live Score: <strong className="text-slate-900">{activeStarMetrics.starPct}%</strong></span>
+                <span className="text-blue-700 font-semibold">{activePerformance.label}</span>
+              </div>
+              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden flex border border-slate-200 relative">
+                <div
+                  style={{ width: `${Math.min(100, Math.max(0, activeStarMetrics.starPct))}%` }}
+                  className="bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500"
+                />
+              </div>
+              <div className="flex justify-between text-[10px] font-mono text-slate-400 font-semibold pt-0.5">
+                <span>1.0 ★ (0%)</span>
+                <span>2.0 ★ (50%)</span>
+                <span>3.0 ★ (65%)</span>
+                <span>4.0 ★ (75%)</span>
+                <span>5.0 ★ (85%+)</span>
+              </div>
+            </div>
+
+            {/* Quick 3-Tile Breakdown */}
+            <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-slate-100 font-mono text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase">Enrolled Cohort</span>
+                <span className="text-base font-bold text-slate-900 mt-0.5 block">{activeMembers.length} Members</span>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase">Gap-Free Members</span>
+                <span className="text-base font-bold text-emerald-700 mt-0.5 block">{activeStarMetrics.gapFreeMembers} Compliant</span>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="text-[10px] text-slate-500 block uppercase">Members With Gaps</span>
+                <span className="text-base font-bold text-rose-600 mt-0.5 block">{activeStarMetrics.membersWithGaps} Actionable</span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
-            <span className="text-blue-600">{activePerformance.label}</span>
-            <span className="text-[11px] font-mono text-slate-500">Cutpoint: MY2026</span>
+          {/* Bento Card 2: Structured Clinical Measure Matrix Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                  <span>Assigned Quality Measures Matrix ({planMeasureMatrix.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time NCQA HEDIS criteria compliance, Star reachability, and CareImpact priority rankings.
+                </p>
+              </div>
+
+              <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+                {diseaseAffiliation.targetPopulation}
+              </span>
+            </div>
+
+            {/* Matrix Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-500">
+                    <th className="py-2.5 px-3 font-semibold">Measure / Disease</th>
+                    <th className="py-2.5 px-2 font-semibold text-center">Weight</th>
+                    <th className="py-2.5 px-3 font-semibold">Compliance Rate</th>
+                    <th className="py-2.5 px-2 font-semibold text-center">Gaps</th>
+                    <th className="py-2.5 px-3 font-semibold text-center">Next Star Leap</th>
+                    <th className="py-2.5 px-2 font-semibold text-center">Priority</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {planMeasureMatrix.map((item) => {
+                    const isTriple = item.cmsWeight >= 3;
+                    return (
+                      <tr key={item.code} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px]">
+                              {item.code}
+                            </span>
+                            <div>
+                              <div className="font-bold text-slate-900">{item.name}</div>
+                              <div className="text-[11px] text-slate-500 font-normal">{item.domain}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-2 text-center font-mono">
+                          {isTriple ? (
+                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10px]">
+                              3x Triple
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 font-medium text-[11px]">
+                              {item.cmsWeight}x
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3 min-w-[130px]">
+                          <div className="space-y-1">
+                            <div className="flex justify-between font-mono text-[11px]">
+                              <span className="font-bold text-slate-900">{item.rate}%</span>
+                              <span className="text-slate-500">{item.compliant}/{item.eligible}</span>
+                            </div>
+                            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden flex border border-slate-200">
+                              <div style={{ width: `${item.rate}%` }} className="bg-emerald-500 h-full rounded-full" />
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-2 text-center font-mono font-bold text-rose-600">
+                          {item.gaps}
+                        </td>
+
+                        <td className="py-3 px-3 text-center font-mono text-[11px]">
+                          {item.nextStar ? (
+                            <span className="text-blue-700 font-semibold" title={`Need ${item.gapsNeeded} more gap closures for ${item.nextStar}★`}>
+                              {item.nextStar}★ <span className="text-slate-400">({item.gapsNeeded} needed)</span>
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-semibold">5★ Top Tier</span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-2 text-center font-mono">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                            item.priorityScore >= 75
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {item.priorityScore}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            onClick={() => navigate('/members')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all shadow-2xs"
+                          >
+                            <span>Gaps</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {planMeasureMatrix.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
+                        No quality measures assigned to this plan cohort.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        {/* Card 2: Enrolled Population */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono">
-                Active Enrolled Patients
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shadow-2xs">
-                <Users className="w-4 h-4" />
+        {/* ===================================================================== */}
+        {/* RIGHT COLUMN: 4 COLS (33.3%) - ACTIONABLE QUEUE & EXECUTIVE SIDEBAR   */}
+        {/* ===================================================================== */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Sidebar Card 1: Urgent Nurse Outreach Queue */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <PhoneCall className="w-4 h-4 text-rose-600" />
+                <h3 className="text-sm font-bold text-slate-900">Urgent Outreach Queue</h3>
               </div>
-            </div>
-
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900 font-mono">{activeMembers.length}</span>
-              <span className="text-xs text-slate-500">members in plan</span>
-            </div>
-          </div>
-
-          {/* Mini Split Progress Bar */}
-          <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
-            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex border border-slate-200">
-              <div
-                style={{ width: `${(activeStarMetrics.gapFreeMembers / Math.max(1, activeMembers.length)) * 100}%` }}
-                className="bg-emerald-500 h-full rounded-l-full"
-              />
-              <div
-                style={{ width: `${(activeStarMetrics.membersWithGaps / Math.max(1, activeMembers.length)) * 100}%` }}
-                className="bg-rose-400 h-full rounded-r-full"
-              />
-            </div>
-            <div className="flex items-center justify-between text-[11px] font-medium">
-              <span className="text-emerald-700 font-semibold">{activeStarMetrics.gapFreeMembers} Gap-Free</span>
-              <span className="text-rose-700 font-semibold">{activeStarMetrics.membersWithGaps} With Gaps</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Evaluated Criteria & Triple Weight */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono">
-                Assigned Plan Criteria
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                Top Priority
               </span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shadow-2xs">
-                <Activity className="w-4 h-4" />
-              </div>
             </div>
 
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900 font-mono">{diseaseAffiliation.diseases.length}</span>
-              <span className="text-xs text-slate-500">measures evaluated</span>
+            <div className="space-y-2.5">
+              {prioritizedPatientsQueue.map((patient) => (
+                <div
+                  key={patient.id}
+                  onClick={() => navigate(`/members/${patient.id}`)}
+                  className="p-3 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-200 transition-all cursor-pointer shadow-2xs flex items-center justify-between gap-3 group"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 text-xs group-hover:text-blue-700 flex items-center gap-1.5">
+                      <span className="truncate">{patient.fullName}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">({patient.age}y)</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono truncate mt-0.5">
+                      Gaps: <strong className="text-rose-600">{patient.gapCount} Open</strong> · ZIP {patient.zip || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-mono font-black text-xs">
+                      {patient.priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {prioritizedPatientsQueue.length === 0 && (
+                <div className="text-center py-6 text-xs text-slate-500 space-y-1">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+                  <p className="font-semibold text-slate-700">All members are 100% compliant!</p>
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
-            <span className="text-blue-700 font-medium truncate max-w-[170px]" title={diseaseAffiliation.diseases.map(d => d.code).join(', ')}>
-              {diseaseAffiliation.diseases.map(d => d.code).join(', ') || 'Exempt'}
-            </span>
-            <span className="text-[11px] text-slate-500">NCQA Standard</span>
-          </div>
-        </div>
-
-        {/* Card 4: Actionable Care Gap List */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider font-mono">
-                Clinical Outreach Queue
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shadow-2xs">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-black text-rose-600 font-mono">
-                {activeStarMetrics.membersWithGaps}
-              </span>
-              <span className="text-xs text-slate-500">actionable patients</span>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-rose-700 font-bold font-mono">
-              {highPriorityCount} Urgent Priority
-            </span>
             <button
               onClick={() => navigate('/members')}
-              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              className="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all shadow-2xs flex items-center justify-center gap-1.5"
             >
-              <span>Review Queue</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <span>View All {activeMembers.length} Members</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Sidebar Card 2: Highest Strategic Star ROI Callout */}
+          {highestRoiMeasure && (
+            <div className="bg-gradient-to-br from-blue-50 via-white to-white border border-blue-200 rounded-3xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-blue-700 font-mono flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Strategic Star Lever</span>
+                </span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-300">
+                  {highestRoiMeasure.cmsWeight}x CMS Weight
+                </span>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  {highestRoiMeasure.name} ({highestRoiMeasure.code})
+                </h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Closing <strong className="text-slate-900">{highestRoiMeasure.gaps} open gaps</strong> in {highestRoiMeasure.code} provides the fastest mathematical path to move {activeCompany?.companyName} to the next Star cutpoint.
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigate('/simulator')}
+                className="w-full py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Simulate {highestRoiMeasure.code} Gap Closure</span>
+              </button>
+            </div>
+          )}
+
+          {/* Sidebar Card 3: Quick AI Clinical Copilot Launch */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+            <div className="flex items-center gap-2">
+              <Bot className="w-5 h-5 text-emerald-600" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Clinical AI Quality Assistant</h4>
+                <p className="text-[11px] text-slate-500">Live for {activeCompany?.companyName}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Ask questions about {activeCompany?.companyName}'s high-priority members, nurse outreach phone scripts, or NCQA HEDIS criteria rules.
+            </p>
+
+            <button
+              onClick={() => navigate('/assistant')}
+              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 transition-all shadow-2xs flex items-center justify-center gap-1.5"
+            >
+              <span>Launch AI Copilot</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* 3. Structured Clinical Measure Architecture Matrix */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <HeartPulse className="w-5 h-5 text-blue-600" />
-              <span>{activeCompany?.companyName} Affiliated Chronic Disease & Clinical Measure Architecture</span>
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Target Clinical Population: <strong className="text-slate-900">{diseaseAffiliation.targetPopulation}</strong>.
-              Each disease is scored under standardized NCQA HEDIS criteria rules.
-            </p>
-          </div>
+      {/* ========================================================================= */}
+      {/* 3. FULL-WIDTH LOWER BENTO SECTION: CRITERIA ROOT-CAUSE EXPLORER & MAP */}
+      {/* ========================================================================= */}
+      <div className="space-y-6">
+        {/* Criteria-Based Quality & "Why Gaps Occur" Root Cause Analysis */}
+        <CriteriaAnalysisCards
+          members={activeMembers}
+          scopeTitle={activeCompany?.companyName || 'Medicare'}
+        />
 
-          <span className="text-xs font-mono font-bold px-3 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 shrink-0 shadow-2xs">
-            {diseaseAffiliation.diseases.length} Active Plan Protocols
-          </span>
-        </div>
-
-        {/* Matrix Table Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {diseaseAffiliation.diseases.map((item) => {
-            const catalog = CLINICAL_MEASURE_CATALOG[item.code];
-            const isTriple = item.cmsWeight >= 3;
-
-            return (
-              <div
-                key={item.code}
-                className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3.5 ${
-                  isTriple
-                    ? 'bg-blue-50/40 border-blue-200 hover:border-blue-300'
-                    : 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-white text-slate-900 border border-slate-200 shadow-2xs">
-                        {item.code}
-                      </span>
-                      {isTriple ? (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded bg-blue-100 text-blue-800 border border-blue-300">
-                          3x CMS Weight
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono font-semibold px-2 py-0.2 rounded bg-white text-slate-600 border border-slate-200">
-                          {item.cmsWeight}x Weight
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-500 font-semibold uppercase">
-                      {catalog?.domain || 'Clinical'}
-                    </span>
-                  </div>
-
-                  <h4 className="text-sm font-bold text-slate-900 mt-2.5 leading-snug">
-                    {item.diseaseName}
-                  </h4>
-                  <div className="text-xs text-blue-700 font-semibold mt-0.5">
-                    {item.measureName}
-                  </div>
-
-                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                    {item.clinicalRationale}
-                  </p>
-                </div>
-
-                <div className="pt-2.5 border-t border-slate-200/80 space-y-1.5 text-[11px] font-mono">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span>Criteria Rule:</span>
-                    <span className="text-slate-800 font-semibold truncate max-w-[180px]" title={catalog?.criteriaRule}>
-                      {catalog?.criteriaRule || 'Evaluation Rule'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {diseaseAffiliation.diseases.length === 0 && (
-            <div className="col-span-full py-10 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-slate-200">
-              <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              Uninsured cohort (NO_INSURANCE) has no payer quality rating criteria.
-            </div>
-          )}
-        </div>
+        {/* Geographic Map Analysis for this specific company */}
+        <GeographicMapCard
+          members={activeMembers}
+          scopeTitle={activeCompany?.companyName || 'Medicare'}
+        />
       </div>
-
-      {/* 4. Criteria Analysis & Root Cause Deep-Dive */}
-      <CriteriaAnalysisCards
-        members={activeMembers}
-        scopeTitle={activeCompany?.companyName || 'Medicare'}
-      />
-
-      {/* 5. Regional Geographic Mapping & Cluster Heatmap */}
-      <GeographicMapCard
-        members={activeMembers}
-        scopeTitle={activeCompany?.companyName || 'Medicare'}
-      />
     </div>
   );
 }
