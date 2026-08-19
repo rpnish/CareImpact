@@ -12,7 +12,7 @@ import { MemberStoreProvider } from './context/MemberStoreContext';
 
 function AppContent() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* Top Sticky Navigation */}
       <Navbar />
 
@@ -31,16 +31,16 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* Clean Enterprise Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500">
+      {/* Clean Enterprise Healthcare Footer */}
+      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-300">CareImpact · Medicare Star Ratings & Quality Gap Intelligence</span>
+            <span className="font-semibold text-slate-800">CareImpact · Medicare Star Ratings & Quality Gap Intelligence</span>
             <span>·</span>
-            <span>NCQA HEDIS MY2026</span>
+            <span className="text-blue-600 font-medium">NCQA HEDIS MY2026</span>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">
-            Data Source: <code className="text-slate-400 font-mono">data/newmembers.csv</code>
+            Data Source: <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">data/newmembers.csv</code>
           </div>
         </div>
       </footer>

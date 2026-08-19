@@ -40,28 +40,28 @@ export function ToastProvider({ children }) {
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl border backdrop-blur-lg ${
+              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-xl border backdrop-blur-md bg-white ${
                 t.type === 'success'
-                  ? 'bg-navy-900/95 border-teal/40 text-teal-light shadow-glow-teal'
+                  ? 'border-emerald-300 text-slate-800'
                   : t.type === 'error'
-                  ? 'bg-navy-900/95 border-rose/40 text-rose-light shadow-glow-rose'
+                  ? 'border-rose-300 text-slate-800'
                   : t.type === 'warning'
-                  ? 'bg-navy-900/95 border-amber/40 text-amber-light shadow-glow-amber'
-                  : 'bg-navy-900/95 border-slate-700 text-slate-200'
+                  ? 'border-amber-300 text-slate-800'
+                  : 'border-slate-200 text-slate-800'
               }`}
             >
               <div className="shrink-0 mt-0.5">
-                {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-teal-light" />}
-                {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-light" />}
-                {t.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-light" />}
-                {t.type === 'info' && <Info className="w-5 h-5 text-sky-400" />}
+                {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600" />}
+                {t.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600" />}
+                {t.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
               </div>
-              <div className="flex-1 text-sm font-medium text-slate-100 leading-snug">
+              <div className="flex-1 text-xs font-semibold text-slate-800 leading-snug">
                 {t.message}
               </div>
               <button
                 onClick={() => removeToast(t.id)}
-                className="shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
+                className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

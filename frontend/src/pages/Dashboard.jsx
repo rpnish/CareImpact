@@ -126,13 +126,13 @@ export default function Dashboard() {
   if (error && !hierarchy) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <div className="bg-slate-900 border border-rose-800/60 rounded-3xl p-8 space-y-4">
-          <AlertOctagon className="w-10 h-10 text-rose-400 mx-auto" />
-          <h2 className="text-xl font-bold text-white">Failed to Load Dashboard Data</h2>
-          <p className="text-sm text-slate-300 max-w-md mx-auto">{error}</p>
+        <div className="bg-white border border-rose-200 rounded-3xl p-8 space-y-4 shadow-sm">
+          <AlertOctagon className="w-10 h-10 text-rose-500 mx-auto" />
+          <h2 className="text-xl font-bold text-slate-900">Failed to Load Dashboard Data</h2>
+          <p className="text-sm text-slate-600 max-w-md mx-auto">{error}</p>
           <button
             onClick={loadData}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs"
           >
             <RefreshCw className="w-4 h-4" />
             Retry Load
@@ -145,24 +145,24 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* 1. Page Title & Action */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {activeCompany?.companyName || 'Medicare'} Quality & Clinical Intelligence
             </h1>
-            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
               {activeCompany?.ownershipTypes?.join(', ') || 'GOVERNMENT'}
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Real-time NCQA HEDIS criteria analysis, CareImpact Priority Engine rankings, and affiliated chronic disease tracking.
           </p>
         </div>
 
         <button
           onClick={() => navigate('/members')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm shrink-0"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs shrink-0"
         >
           <Users className="w-4 h-4" />
           <span>View {activeCompany?.companyName} Prioritized Roster ({activeMembers.length})</span>
@@ -182,94 +182,94 @@ export default function Dashboard() {
       {/* 3. Plan-Specific KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* Star Rating Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               {activeCompany?.companyName} Star Rating
             </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <Star className="w-4 h-4 fill-amber-400" />
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+              <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-amber-400 font-mono">
+            <span className="text-3xl font-black text-slate-900 font-mono">
               {activeStarMetrics.starPct}%
             </span>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono">
+            <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-mono">
               {activeStarMetrics.weightedStarValue || activeStarMetrics.starValue} ★
             </span>
           </div>
-          <div className="mt-2 text-xs font-semibold flex items-center gap-1.5">
-            <span className={activePerformance.textClass}>{activePerformance.label}</span>
+          <div className="mt-2 text-xs font-semibold flex items-center gap-1.5 text-blue-600">
+            <span>{activePerformance.label}</span>
           </div>
         </div>
 
         {/* Member Population */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Enrolled Patients</span>
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Enrolled Patients</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white font-mono">{activeMembers.length}</span>
-            <span className="text-xs text-slate-400">members in plan</span>
+            <span className="text-3xl font-black text-slate-900 font-mono">{activeMembers.length}</span>
+            <span className="text-xs text-slate-500">members in plan</span>
           </div>
-          <div className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
-            <span className="text-emerald-400 font-semibold">{activeStarMetrics.gapFreeMembers} Gap-Free</span>
+          <div className="mt-2 text-xs text-slate-500 flex items-center gap-1.5 font-medium">
+            <span className="text-emerald-700 font-semibold">{activeStarMetrics.gapFreeMembers} Gap-Free</span>
             <span>·</span>
-            <span className="text-rose-400 font-semibold">{activeStarMetrics.membersWithGaps} With Gaps</span>
+            <span className="text-rose-700 font-semibold">{activeStarMetrics.membersWithGaps} With Gaps</span>
           </div>
         </div>
 
         {/* Assigned Criteria Count */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Criteria</span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assigned Criteria</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
               <Activity className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white font-mono">{diseaseAffiliation.diseases.length}</span>
-            <span className="text-xs text-slate-400">measures evaluated</span>
+            <span className="text-3xl font-black text-slate-900 font-mono">{diseaseAffiliation.diseases.length}</span>
+            <span className="text-xs text-slate-500">measures evaluated</span>
           </div>
-          <div className="mt-2 text-xs text-slate-400 font-mono">
+          <div className="mt-2 text-xs text-blue-700 font-mono font-medium truncate">
             {diseaseAffiliation.diseases.map((d) => d.code).join(', ') || 'None (Exempt)'}
           </div>
         </div>
 
         {/* Members Requiring Outreach */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 relative shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Outreach Action List</span>
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-800/40 flex items-center justify-center">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Outreach Action List</span>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-rose-400 font-mono">
+            <span className="text-3xl font-black text-rose-600 font-mono">
               {activeStarMetrics.membersWithGaps}
             </span>
-            <span className="text-xs text-slate-400">patients with care gaps</span>
+            <span className="text-xs text-slate-500">patients with care gaps</span>
           </div>
-          <div className="mt-2 text-xs text-slate-400">
+          <div className="mt-2 text-xs text-slate-500 font-medium">
             Actionable clinical priority cohort
           </div>
         </div>
       </div>
 
       {/* 4. Plan Affiliated Chronic Diseases & Measure Mapping Architecture */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
         <div className="flex items-start sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <HeartPulse className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <HeartPulse className="w-5 h-5 text-blue-600" />
               <span>{activeCompany?.companyName} Affiliated Chronic Disease & Clinical Measure Architecture</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Target clinical cohort: <span className="text-slate-200 font-medium">{diseaseAffiliation.targetPopulation}</span>.
+            <p className="text-xs text-slate-600 mt-0.5">
+              Target clinical cohort: <span className="text-slate-900 font-semibold">{diseaseAffiliation.targetPopulation}</span>.
               Each disease is evaluated through an NCQA HEDIS criteria standard.
             </p>
           </div>
@@ -279,31 +279,31 @@ export default function Dashboard() {
           {diseaseAffiliation.diseases.map((item) => (
             <div
               key={item.code}
-              className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-3"
+              className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3"
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-indigo-900/60">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
                     {item.code}
                   </span>
-                  <span className="text-[10px] font-mono font-semibold text-slate-400">
+                  <span className="text-[10px] font-mono font-semibold text-slate-500">
                     {item.cmsWeight}x CMS Weight
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-white mt-2 leading-snug">
+                <h4 className="text-sm font-bold text-slate-900 mt-2 leading-snug">
                   {item.diseaseName}
                 </h4>
-                <div className="text-xs text-slate-400 mt-0.5 font-medium">
+                <div className="text-xs text-blue-700 mt-0.5 font-medium">
                   {item.measureName}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
                   {item.clinicalRationale}
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] font-mono">
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] font-mono">
                 <span className="text-slate-500">Criteria Rule:</span>
-                <span className="text-slate-300 font-semibold truncate max-w-[170px]" title={CLINICAL_MEASURE_CATALOG[item.code]?.criteriaRule}>
+                <span className="text-slate-800 font-semibold truncate max-w-[170px]" title={CLINICAL_MEASURE_CATALOG[item.code]?.criteriaRule}>
                   {CLINICAL_MEASURE_CATALOG[item.code]?.criteriaRule || 'Evaluation Rule'}
                 </span>
               </div>
@@ -311,7 +311,7 @@ export default function Dashboard() {
           ))}
 
           {diseaseAffiliation.diseases.length === 0 && (
-            <div className="col-span-full py-8 text-center text-xs text-slate-500 bg-slate-950 rounded-xl border border-slate-800">
+            <div className="col-span-full py-8 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
               <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               Uninsured cohort (NO_INSURANCE) has no payer quality rating criteria.
             </div>

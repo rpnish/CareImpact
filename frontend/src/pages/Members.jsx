@@ -147,45 +147,45 @@ export default function Members() {
     });
   }, [hierarchy, activeCompany, activePlan, customMembers, memberUpdates, deletedMemberIds]);
 
-  // Filtered & Sorted Members
+  // Filtered members list
   const filteredMembers = useMemo(() => {
-    return baseCohort.filter((m) => {
-      // Search text
-      const matchesSearch =
-        m.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.patientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.memberId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.planName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.zip?.includes(searchTerm);
+    return baseCohort
+      .filter((m) => {
+        // Search
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase();
+          const matchName = m.fullName.toLowerCase().includes(q);
+          const matchId = (m.patientId || '').toLowerCase().includes(q) || (m.memberId || '').toLowerCase().includes(q);
+          const matchZip = (m.zip || '').includes(q);
+          const matchPlan = (m.planName || '').toLowerCase().includes(q);
+          if (!matchName && !matchId && !matchZip && !matchPlan) return false;
+        }
 
-      // Gap Status
-      let matchesGap = true;
-      if (gapFilter === 'GAP_ONLY') matchesGap = m.hasCareGap;
-      if (gapFilter === 'MET_ONLY') matchesGap = !m.hasCareGap;
+        // Gap filter
+        if (gapFilter === 'GAP_ONLY' && !m.hasCareGap) return false;
+        if (gapFilter === 'MET_ONLY' && m.hasCareGap) return false;
 
-      // Specific Measure Gap
-      let matchesMeasure = true;
-      if (measureFilter !== 'ALL') {
-        matchesMeasure = m.measures?.[measureFilter] === 'GAP';
-      }
+        // Specific measure filter
+        if (measureFilter !== 'ALL') {
+          if (m.measures?.[measureFilter] !== 'GAP') return false;
+        }
 
-      // Gender
-      let matchesGender = true;
-      if (genderFilter !== 'ALL') {
-        matchesGender = m.gender === genderFilter;
-      }
+        // Gender filter
+        if (genderFilter !== 'ALL') {
+          if (m.gender !== genderFilter) return false;
+        }
 
-      return matchesSearch && matchesGap && matchesMeasure && matchesGender;
-    }).sort((a, b) => {
-      if (sortBy === 'gaps_desc') return b.gapCount - a.gapCount;
-      if (sortBy === 'gaps_asc') return a.gapCount - b.gapCount;
-      if (sortBy === 'priority_desc') return b.priority - a.priority;
-      if (sortBy === 'priority_asc') return a.priority - b.priority;
-      if (sortBy === 'name_asc') return a.fullName.localeCompare(b.fullName);
-      if (sortBy === 'age_desc') return (Number(b.age) || 0) - (Number(a.age) || 0);
-      return 0;
-    });
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'priority_desc') return (b.priority || 0) - (a.priority || 0);
+        if (sortBy === 'priority_asc') return (a.priority || 0) - (b.priority || 0);
+        if (sortBy === 'gaps_desc') return b.gapCount - a.gapCount;
+        if (sortBy === 'gaps_asc') return a.gapCount - b.gapCount;
+        if (sortBy === 'name_asc') return a.fullName.localeCompare(b.fullName);
+        if (sortBy === 'age_desc') return b.age - a.age;
+        return 0;
+      });
   }, [baseCohort, searchTerm, gapFilter, measureFilter, genderFilter, sortBy]);
 
   // Pagination
@@ -195,7 +195,7 @@ export default function Members() {
     return filteredMembers.slice(start, start + itemsPerPage);
   }, [filteredMembers, currentPage, itemsPerPage]);
 
-  // Delete Action Handler
+  // Handle Delete Confirmation
   const handleConfirmDelete = () => {
     if (!memberToDelete) return;
     try {
@@ -273,18 +273,18 @@ export default function Members() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
-              <Users className="w-7 h-7 text-indigo-400" />
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+              <Users className="w-7 h-7 text-blue-600" />
               <span>{activeCompany?.companyName || 'Medicare'} Member Roster</span>
             </h1>
-            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
               {baseCohort.length} Enrolled
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Click any member to view clinical details, close care gaps with hospital document proof, or manage enrollment.
           </p>
         </div>
@@ -292,7 +292,7 @@ export default function Members() {
         <div className="flex items-center gap-3 flex-wrap shrink-0">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs"
           >
             <UserPlus className="w-4 h-4" />
             <span>+ Enroll New Member</span>
@@ -300,9 +300,9 @@ export default function Members() {
 
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 text-slate-500" />
             <span>Export CSV ({filteredMembers.length})</span>
           </button>
         </div>
@@ -318,10 +318,10 @@ export default function Members() {
       />
 
       {/* 3. Search and Multi-Filter Toolbar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 shadow-xs">
         {/* Search */}
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search patient name, ID, ZIP, or plan..."
@@ -330,21 +330,21 @@ export default function Members() {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
           />
         </div>
 
         {/* Filter Controls */}
         <div className="flex items-center flex-wrap gap-2.5">
           {/* Gap Status Filter */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
             <button
               onClick={() => {
                 setGapFilter('ALL');
                 setCurrentPage(1);
               }}
               className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                gapFilter === 'ALL' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+                gapFilter === 'ALL' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               All ({baseCohort.length})
@@ -356,8 +356,8 @@ export default function Members() {
               }}
               className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                 gapFilter === 'GAP_ONLY'
-                  ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                  : 'text-slate-400 hover:text-rose-400'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-rose-600'
               }`}
             >
               With Gaps ({baseCohort.filter((m) => m.hasCareGap).length})
@@ -369,8 +369,8 @@ export default function Members() {
               }}
               className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                 gapFilter === 'MET_ONLY'
-                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                  : 'text-slate-400 hover:text-emerald-400'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-emerald-700'
               }`}
             >
               Gap-Free ({baseCohort.filter((m) => !m.hasCareGap).length})
@@ -384,7 +384,7 @@ export default function Members() {
               setMeasureFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none font-medium"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-800 focus:outline-none font-medium"
           >
             <option value="ALL">Filter by Measure: All</option>
             {MEASURE_CODES.map((c) => (
@@ -401,7 +401,7 @@ export default function Members() {
               setGenderFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none font-medium"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-800 focus:outline-none font-medium"
           >
             <option value="ALL">Gender: All</option>
             <option value="F">Female (F)</option>
@@ -412,7 +412,7 @@ export default function Members() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none font-medium"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-800 focus:outline-none font-medium"
           >
             <option value="priority_desc">Sort: Priority High → Low</option>
             <option value="gaps_desc">Sort: Most Gaps First</option>
@@ -425,10 +425,10 @@ export default function Members() {
       </div>
 
       {/* 4. Full Patient Members Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-md">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-950 text-slate-400 font-mono text-[11px] uppercase tracking-wider border-b border-slate-800 sticky top-0 z-10">
+            <thead className="bg-slate-50 text-slate-600 font-mono text-[11px] uppercase tracking-wider border-b border-slate-200 sticky top-0 z-10">
               <tr>
                 <th className="py-3.5 px-4 font-semibold">Patient Demographics</th>
                 <th className="py-3.5 px-3 font-semibold">Insurance & Plan</th>
@@ -441,7 +441,7 @@ export default function Members() {
                     title={`${code}: ${CLINICAL_MEASURE_CATALOG[code]?.name} (Weight: ${CLINICAL_MEASURE_CATALOG[code]?.cmsWeight}x)`}
                   >
                     <div className="flex flex-col items-center">
-                      <span className="text-white font-bold">{code}</span>
+                      <span className="text-slate-900 font-bold">{code}</span>
                       <span className="text-[9px] text-slate-500 lowercase">
                         {CLINICAL_MEASURE_CATALOG[code]?.cmsWeight}x
                       </span>
@@ -453,27 +453,27 @@ export default function Members() {
                 <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-slate-200">
               {paginatedMembers.map((member) => (
                 <tr
                   key={member.id}
                   onClick={() => navigate(`/members/${member.id}`)}
-                  className={`hover:bg-slate-850/80 transition-colors cursor-pointer ${
-                    member.hasCareGap ? 'bg-rose-950/5' : 'bg-transparent'
+                  className={`hover:bg-blue-50/40 transition-colors cursor-pointer ${
+                    member.hasCareGap ? 'bg-rose-50/10' : 'bg-transparent'
                   }`}
                 >
                   {/* Demographics */}
                   <td className="py-3.5 px-4">
-                    <div className="font-bold text-white text-sm flex items-center gap-2">
+                    <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
                       <span>{member.fullName}</span>
                       {member.proofDocuments?.length > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1 font-mono">
-                          <FileCheck className="w-3 h-3 text-indigo-400" />
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 font-mono font-bold">
+                          <FileCheck className="w-3 h-3 text-blue-600" />
                           <span>Doc Proof</span>
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                    <div className="text-xs text-slate-500 font-mono mt-0.5 flex items-center gap-2">
                       <span>ID: {member.patientId?.slice(0, 8)}...</span>
                       <span>·</span>
                       <span>Age {member.age}</span>
@@ -484,8 +484,8 @@ export default function Members() {
 
                   {/* Insurance & Plan */}
                   <td className="py-3.5 px-3 font-mono text-xs">
-                    <div className="font-semibold text-slate-200">{member.company}</div>
-                    <div className="text-slate-400 text-[11px] truncate max-w-[140px]" title={member.planName}>
+                    <div className="font-semibold text-slate-900">{member.company}</div>
+                    <div className="text-slate-500 text-[11px] truncate max-w-[140px]" title={member.planName}>
                       {member.planName}
                     </div>
                   </td>
@@ -493,13 +493,13 @@ export default function Members() {
                   {/* Status Badge */}
                   <td className="py-3.5 px-3 text-center">
                     {member.hasCareGap ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-950 text-rose-300 border border-rose-800 font-mono">
-                        <AlertOctagon className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono">
+                        <AlertOctagon className="w-3 h-3 text-rose-600" />
                         <span>GAP</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                         <span>MET</span>
                       </span>
                     )}
@@ -512,7 +512,7 @@ export default function Members() {
                       <td key={code} className="py-3.5 px-1 text-center">
                         {result === 'MET' && (
                           <span
-                            className="inline-block px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-bold text-[10px]"
+                            className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-[10px]"
                             title={`${CLINICAL_MEASURE_CATALOG[code]?.name}: MET`}
                           >
                             MET
@@ -520,7 +520,7 @@ export default function Members() {
                         )}
                         {result === 'GAP' && (
                           <span
-                            className="inline-block px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono font-bold text-[10px]"
+                            className="inline-block px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-mono font-bold text-[10px]"
                             title={`${CLINICAL_MEASURE_CATALOG[code]?.name}: OPEN CARE GAP`}
                           >
                             GAP
@@ -528,7 +528,7 @@ export default function Members() {
                         )}
                         {result === 'N/A' && (
                           <span
-                            className="inline-block px-1.5 py-0.5 text-slate-600 font-mono text-[10px]"
+                            className="inline-block px-1.5 py-0.5 text-slate-400 font-mono text-[10px]"
                             title={`${CLINICAL_MEASURE_CATALOG[code]?.name}: Not Applicable`}
                           >
                             —
@@ -541,9 +541,9 @@ export default function Members() {
                   {/* Applicable & Gap Count */}
                   <td className="py-3.5 px-3 text-center font-mono">
                     <div className="flex items-center justify-center gap-1.5">
-                      <span className="text-slate-300 font-bold">{member.applicableCount} App</span>
+                      <span className="text-slate-700 font-bold">{member.applicableCount} App</span>
                       <span>·</span>
-                      <span className={`font-black ${member.gapCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      <span className={`font-black ${member.gapCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {member.gapCount} Gaps
                       </span>
                     </div>
@@ -552,20 +552,20 @@ export default function Members() {
                   {/* Priority Column */}
                   <td className="py-3.5 px-4 text-center font-mono">
                     {member.priority >= 75 ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-bold text-xs">
-                        <AlertTriangle className="w-3 h-3 text-rose-400" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs">
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
                         <span>{member.priority}</span>
                       </span>
                     ) : member.priority >= 50 ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-bold text-xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs">
                         <span>{member.priority}</span>
                       </span>
                     ) : member.priority > 0 ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-semibold text-xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-xs">
                         <span>{member.priority}</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-950 text-slate-500 border border-slate-800 text-[11px]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[11px]">
                         <span>0</span>
                       </span>
                     )}
@@ -579,7 +579,7 @@ export default function Members() {
                           e.stopPropagation();
                           navigate(`/members/${member.id}`);
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-indigo-400 hover:text-white bg-slate-950 hover:bg-slate-800 border border-slate-800 transition-all"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all shadow-2xs"
                       >
                         <span>Update</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -590,7 +590,7 @@ export default function Members() {
                           e.stopPropagation();
                           setMemberToDelete(member);
                         }}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/60 transition-all"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
                         title={`Delete ${member.fullName}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -604,28 +604,28 @@ export default function Members() {
         </div>
 
         {/* 5. Pagination Footer */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
           <div>
-            Showing <span className="font-bold text-white">{filteredMembers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to{' '}
-            <span className="font-bold text-white">{Math.min(currentPage * itemsPerPage, filteredMembers.length)}</span> of{' '}
-            <span className="font-bold text-white">{filteredMembers.length}</span> members
+            Showing <span className="font-bold text-slate-900">{filteredMembers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to{' '}
+            <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredMembers.length)}</span> of{' '}
+            <span className="font-bold text-slate-900">{filteredMembers.length}</span> members
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="p-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="font-mono text-xs font-semibold px-2">
+            <span className="font-mono text-xs font-semibold px-2 text-slate-800">
               Page {currentPage} of {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="p-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -646,25 +646,25 @@ export default function Members() {
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {memberToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-900 border border-rose-800/80 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl"
+              className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl"
             >
-              <div className="flex items-center gap-3 text-rose-400">
-                <div className="p-3 rounded-2xl bg-rose-950 border border-rose-800 shrink-0">
+              <div className="flex items-center gap-3 text-rose-600">
+                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 shrink-0">
                   <Trash2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Delete Member Record?</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">This action cannot be undone.</p>
+                  <h3 className="text-base font-bold text-slate-900">Delete Member Record?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">This action cannot be undone.</p>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800">
-                Are you sure you want to remove <strong className="text-white">{memberToDelete.fullName}</strong> ({memberToDelete.patientId}) from <strong className="text-indigo-300">{memberToDelete.company}</strong>?
+              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                Are you sure you want to remove <strong className="text-slate-900">{memberToDelete.fullName}</strong> ({memberToDelete.patientId}) from <strong className="text-blue-700">{memberToDelete.company}</strong>?
                 This will recalculate the plan quality metrics and remove this patient from the active roster.
               </p>
 
@@ -672,14 +672,14 @@ export default function Members() {
                 <button
                   type="button"
                   onClick={() => setMemberToDelete(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-all shadow-md flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs flex items-center gap-1.5"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Yes, Delete Member</span>

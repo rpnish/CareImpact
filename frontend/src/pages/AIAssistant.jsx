@@ -30,6 +30,7 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 
 export default function AIAssistant() {
   const messagesEndRef = useRef(null);
+  const toast = useToast();
   const { selectedCompanyName, selectedPlanName } = useCompanyScope();
   const { hierarchy, customMembers, memberUpdates, deletedMemberIds } = useMemberStore();
 
@@ -125,91 +126,72 @@ export default function AIAssistant() {
     };
 
     const starMetrics = computeStarRating(activeMembers, compName);
-
-    // Patients with gaps sorted by Priority
-    const patientsWithGaps = activeMembers
+    const membersWithGapsList = activeMembers
       .filter((m) => m.hasCareGap)
       .sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-    // Summary of prioritized patients text
-    const patientLines = patientsWithGaps.slice(0, 10).map((m) => {
-      const openMeasures = Object.entries(m.measures || {})
+    const topPrioritizedSummary = membersWithGapsList.slice(0, 8).map((m) => {
+      const openGaps = Object.entries(m.measures || {})
         .filter(([_, status]) => status === 'GAP')
-        .map(([code]) => `${code} (${CLINICAL_MEASURE_CATALOG[code]?.name || code})`)
+        .map(([code]) => code)
         .join(', ');
+      return `- Patient: ${m.fullName}, Age: ${m.age}, Gender: ${m.gender}, ID: ${m.patientId}, Priority: ${m.priority || 0}, Open Gaps: [${openGaps}]`;
+    }).join('\n');
 
-      return `- ${m.fullName} (Age: ${m.age}, ZIP: ${m.zip || 'N/A'}, Priority: ${m.priority || 0}) | Open Gaps: ${openMeasures || 'None'}`;
-    });
-
-    const criteriaLines = affiliation.diseases.map(
-      (d) => `- ${d.code} (${d.measureName}, ${d.cmsWeight}x Weight): Target Disease "${d.diseaseName}". Rule: ${CLINICAL_MEASURE_CATALOG[d.code]?.criteriaRule}`
-    );
+    const criteriaSummary = affiliation.diseases.map((d) => {
+      const catalogInfo = CLINICAL_MEASURE_CATALOG[d.code];
+      return `• ${d.code} (${d.diseaseName}) [${d.cmsWeight}x Weight]: ${d.measureName}. Criteria: ${catalogInfo?.criteriaRule}. Why Gap Occurs: ${catalogInfo?.whyGapsOccur}`;
+    }).join('\n');
 
     return {
       companyName: compName,
-      targetPopulation: affiliation.targetPopulation,
       totalMembers: activeMembers.length,
-      gapCount: starMetrics.totalGaps,
-      metCount: starMetrics.totalMet,
-      gapFreeMembers: starMetrics.gapFreeMembers,
-      membersWithGaps: starMetrics.membersWithGaps,
+      starRating: `${starMetrics.starPct}% (${starMetrics.weightedStarValue || starMetrics.starValue}★)`,
       compliancePct: starMetrics.starPct,
-      starRating: `${starMetrics.weightedStarValue || starMetrics.starValue}★`,
-      assignedDiseases: affiliation.diseases,
-      criteriaSummary: criteriaLines.join('\n'),
-      prioritizedPatients: patientLines.join('\n') || 'All members in this cohort are gap-free!',
-      patientList: patientsWithGaps,
+      membersWithGaps: starMetrics.membersWithGaps,
+      gapFreeMembers: starMetrics.gapFreeMembers,
+      gapCount: starMetrics.gapCount,
+      targetPopulation: affiliation.targetPopulation,
+      criteriaSummary: criteriaSummary || 'No specific quality measures assigned (Uninsured cohort).',
+      prioritizedPatients: topPrioritizedSummary || 'No patients with open gaps found in this plan.',
+      topMembersList: membersWithGapsList.slice(0, 5),
     };
   }, [activeCompany, activeMembers]);
 
-  // Dynamic Suggested Prompts based on active company
+  // Suggested Prompts
   const dynamicSuggestedPrompts = useMemo(() => {
-    const compName = companyClinicalContext.companyName;
-    const diseaseCodes = companyClinicalContext.assignedDiseases.map((d) => d.code).join(', ');
-
+    const comp = companyClinicalContext.companyName;
     return [
       {
-        id: 'outreach_priority',
-        title: `📞 Who should I call first in ${compName}?`,
-        prompt: `Who are the highest-priority members in ${compName} I should call first today, and why are their priority scores highest?`,
+        id: 'call_first',
+        title: `Who should I call first in ${comp}?`,
+        prompt: `Who should I call first in ${comp}? Please present a prioritized table of members with open care gaps and outreach scripts.`,
       },
       {
-        id: 'star_cutpoint',
-        title: `🎯 Next Star Strategy for ${compName}`,
-        prompt: `What is the fastest way for ${compName} to reach the next Star rating cutpoint across our assigned criteria (${diseaseCodes})?`,
+        id: 'next_star',
+        title: `Next Star Strategy for ${comp}`,
+        prompt: `How can ${comp} reach the next Star rating tier? Explain the highest impact measures and weight calculations.`,
       },
       {
-        id: 'gap_summary',
-        title: `📋 Overview of Open Care Gaps in ${compName}`,
-        prompt: `Provide a detailed breakdown of all open care gaps in ${compName} and why they were triggered under NCQA HEDIS criteria.`,
+        id: 'gap_overview',
+        title: `Overview of Open Care Gaps in ${comp}`,
+        prompt: `Give me a breakdown of all open care gaps in ${comp} by measure and explain why they are triggering gaps.`,
       },
       {
-        id: 'clinical_protocol',
-        title: `🩺 Recommended Interventions for ${compName}`,
-        prompt: `What specific clinical interventions and doctor protocols should we deploy to close care gaps in ${compName}?`,
+        id: 'interventions',
+        title: `Recommended Interventions for ${comp}`,
+        prompt: `What specific clinical interventions should our care team execute this week for ${comp} patients?`,
       },
     ];
-  }, [companyClinicalContext]);
+  }, [companyClinicalContext.companyName]);
 
-  // Set initial greeting when company changes
+  // Initialize initial greeting scoped to active company
   useEffect(() => {
     const compName = companyClinicalContext.companyName;
-    const diseaseList = companyClinicalContext.assignedDiseases.map((d) => `${d.code} (${d.diseaseName})`).join(', ');
-
     setMessages([
       {
         role: 'assistant',
-        content: `### 👋 Welcome! I am your ${compName} Quality Intelligence AI Copilot
-
-I am currently scoped to **${compName}** with live clinical context:
-
-| Plan Metric | Live Cohort Value |
-| :--- | :--- |
-| **Enrolled Population** | **${companyClinicalContext.totalMembers}** members (${companyClinicalContext.membersWithGaps} with care gaps, ${companyClinicalContext.gapFreeMembers} gap-free) |
-| **Current Performance** | **${companyClinicalContext.compliancePct}%** (${companyClinicalContext.starRating}) |
-| **Assigned Quality Criteria** | ${diseaseList || 'No quality criteria assigned'} |
-
-Ask me anything about **${compName}'s** prioritized patients, care gap resolution, NCQA HEDIS rules, or next-Star cutpoint optimization!`,
+        content: `**Hello!** I am your CareImpact Clinical AI Assistant for **${compName}**.\n\nI am scoped to **${companyClinicalContext.totalMembers} enrolled members** (${companyClinicalContext.gapCount} open care gaps) in **${compName}**.\n\nAsk me anything about **${compName}'s** prioritized patients, care gap resolution, NCQA HEDIS rules, or next-Star cutpoint optimization!`,
         model: 'openai/gpt-oss-120b',
         latency_ms: 30,
       },
@@ -404,55 +386,55 @@ CRITICAL FORMATTING & CLINICAL RULES:
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* 1. Scoped Header (NO DROPDOWN AS REQUESTED, Shows Active Company Intelligence) */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
-              <Bot className="w-7 h-7 text-indigo-400" />
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+              <Bot className="w-7 h-7 text-blue-600" />
               <span>AI Quality & Star Rating Assistant</span>
             </h1>
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
               <span>Scoped to: {companyClinicalContext.companyName}</span>
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Clinical intelligence copilot trained on NCQA HEDIS criteria, CareImpact Priority Engine rankings, and{' '}
-            <strong className="text-slate-200">{companyClinicalContext.companyName}'s</strong> live patient data.
+            <strong className="text-slate-900">{companyClinicalContext.companyName}'s</strong> live patient data.
           </p>
         </div>
 
         {/* Intelligence Status Badge */}
-        <div className="flex items-center gap-2 font-mono text-xs text-slate-400 shrink-0">
-          <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Groq Llama-3.3 70B Active</span>
+        <div className="flex items-center gap-2 font-mono text-xs text-slate-600 shrink-0">
+          <div className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 flex items-center gap-2 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold text-slate-800">Groq LPU Active</span>
           </div>
         </div>
       </div>
 
       {/* 2. Company Live Scope Stats Banner */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono shadow-xs">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-indigo-400" />
-            <span className="text-slate-400">Payer Scope:</span>
-            <strong className="text-white">{companyClinicalContext.companyName}</strong>
+            <Building2 className="w-4 h-4 text-blue-600" />
+            <span className="text-slate-500">Payer Scope:</span>
+            <strong className="text-slate-900">{companyClinicalContext.companyName}</strong>
           </div>
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-sky-400" />
-            <span className="text-slate-400">Enrolled Members:</span>
-            <strong className="text-white">{companyClinicalContext.totalMembers}</strong>
+            <Users className="w-4 h-4 text-blue-600" />
+            <span className="text-slate-500">Enrolled Members:</span>
+            <strong className="text-slate-900">{companyClinicalContext.totalMembers}</strong>
           </div>
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-amber-400" />
-            <span className="text-slate-400">Star Rating:</span>
-            <strong className="text-amber-400">{companyClinicalContext.starRating}</strong>
+            <Activity className="w-4 h-4 text-amber-500" />
+            <span className="text-slate-500">Star Rating:</span>
+            <strong className="text-amber-600 font-bold">{companyClinicalContext.starRating}</strong>
           </div>
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400" />
-            <span className="text-slate-400">Open Gaps:</span>
-            <strong className="text-rose-400">{companyClinicalContext.gapCount} Gaps</strong>
+            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <span className="text-slate-500">Open Gaps:</span>
+            <strong className="text-rose-600 font-bold">{companyClinicalContext.gapCount} Gaps</strong>
           </div>
         </div>
 
@@ -463,8 +445,8 @@ CRITICAL FORMATTING & CLINICAL RULES:
 
       {/* 3. Suggested Prompt Chips for this Company */}
       <div className="space-y-2">
-        <span className="text-[11px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
+        <span className="text-[11px] uppercase font-bold text-slate-600 flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5 text-amber-500" />
           <span>Suggested Questions for {companyClinicalContext.companyName}:</span>
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -473,11 +455,11 @@ CRITICAL FORMATTING & CLINICAL RULES:
               key={p.id}
               disabled={loading}
               onClick={() => handleSendMessage(p.prompt)}
-              className="text-left p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-indigo-500/50 transition-all text-xs group disabled:opacity-50"
+              className="text-left p-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-300 transition-all text-xs group disabled:opacity-50 shadow-2xs"
             >
-              <div className="font-bold text-slate-200 group-hover:text-white flex items-center justify-between">
+              <div className="font-bold text-slate-800 group-hover:text-blue-700 flex items-center justify-between">
                 <span>{p.title}</span>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
               </div>
             </button>
           ))}
@@ -485,7 +467,7 @@ CRITICAL FORMATTING & CLINICAL RULES:
       </div>
 
       {/* 4. Chat Conversation Container */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[580px]">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col h-[580px]">
         {/* Chat Messages Scrollable Area */}
         <div className="flex-1 p-5 sm:p-6 overflow-y-auto space-y-5">
           {messages.map((msg, idx) => {
@@ -500,7 +482,7 @@ CRITICAL FORMATTING & CLINICAL RULES:
               >
                 {/* AI Avatar */}
                 {!isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                     <Bot className="w-4 h-4" />
                   </div>
                 )}
@@ -509,60 +491,60 @@ CRITICAL FORMATTING & CLINICAL RULES:
                 <div
                   className={`max-w-3xl rounded-2xl p-4 space-y-2 text-xs leading-relaxed relative group overflow-hidden ${
                     isUser
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-md'
-                      : 'bg-slate-950 text-slate-200 border border-slate-800 rounded-tl-none shadow-sm'
+                      ? 'bg-blue-600 text-white rounded-tr-none shadow-xs'
+                      : 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tl-none shadow-2xs'
                   }`}
                 >
-                  <div className="prose prose-invert max-w-none text-xs">
+                  <div className="prose prose-slate max-w-none text-xs">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
                         table: ({ node, ...props }) => (
-                          <div className="overflow-x-auto my-3 rounded-xl border border-slate-800 bg-slate-900/80">
-                            <table className="w-full text-left text-xs border-collapse divide-y divide-slate-800" {...props} />
+                          <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                            <table className="w-full text-left text-xs border-collapse divide-y divide-slate-200" {...props} />
                           </div>
                         ),
                         thead: ({ node, ...props }) => (
-                          <thead className="bg-slate-950 text-slate-300 font-mono text-[11px] uppercase tracking-wider font-bold" {...props} />
+                          <thead className="bg-slate-100 text-slate-700 font-mono text-[11px] uppercase tracking-wider font-bold" {...props} />
                         ),
                         tbody: ({ node, ...props }) => (
-                          <tbody className="divide-y divide-slate-800/60 font-sans" {...props} />
+                          <tbody className="divide-y divide-slate-200 font-sans" {...props} />
                         ),
                         tr: ({ node, ...props }) => (
-                          <tr className="hover:bg-slate-850/50 transition-colors" {...props} />
+                          <tr className="hover:bg-slate-50 transition-colors" {...props} />
                         ),
                         th: ({ node, ...props }) => (
-                          <th className="py-2.5 px-3.5 text-slate-300 font-semibold border-b border-slate-800" {...props} />
+                          <th className="py-2.5 px-3.5 text-slate-700 font-semibold border-b border-slate-200" {...props} />
                         ),
                         td: ({ node, ...props }) => (
-                          <td className="py-2.5 px-3.5 text-slate-200 text-xs leading-relaxed" {...props} />
+                          <td className="py-2.5 px-3.5 text-slate-800 text-xs leading-relaxed" {...props} />
                         ),
                         ul: ({ node, ...props }) => (
-                          <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-indigo-400" {...props} />
+                          <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-blue-600" {...props} />
                         ),
                         ol: ({ node, ...props }) => (
-                          <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-indigo-400 font-mono" {...props} />
+                          <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-blue-600 font-mono" {...props} />
                         ),
                         li: ({ node, ...props }) => (
-                          <li className="text-slate-200 pl-1" {...props} />
+                          <li className="text-slate-800 pl-1" {...props} />
                         ),
                         p: ({ node, ...props }) => (
-                          <p className="my-1.5 leading-relaxed text-slate-200" {...props} />
+                          <p className="my-1.5 leading-relaxed text-slate-800" {...props} />
                         ),
                         strong: ({ node, ...props }) => (
-                          <strong className="text-white font-bold" {...props} />
+                          <strong className={isUser ? 'text-white font-bold' : 'text-slate-900 font-bold'} {...props} />
                         ),
                         h1: ({ node, ...props }) => (
-                          <h1 className="text-base font-bold text-white mt-3 mb-1.5" {...props} />
+                          <h1 className="text-base font-bold text-slate-900 mt-3 mb-1.5" {...props} />
                         ),
                         h2: ({ node, ...props }) => (
-                          <h2 className="text-sm font-bold text-white mt-3 mb-1.5" {...props} />
+                          <h2 className="text-sm font-bold text-slate-900 mt-3 mb-1.5" {...props} />
                         ),
                         h3: ({ node, ...props }) => (
-                          <h3 className="text-xs font-bold text-indigo-300 mt-2 mb-1 uppercase font-mono" {...props} />
+                          <h3 className="text-xs font-bold text-blue-700 mt-2 mb-1 uppercase font-mono" {...props} />
                         ),
                         code: ({ node, inline, ...props }) => (
-                          <code className="px-1.5 py-0.5 rounded bg-slate-900 font-mono text-[11px] text-indigo-300 border border-slate-800" {...props} />
+                          <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[11px] text-blue-700 border border-slate-200" {...props} />
                         ),
                       }}
                     >
@@ -572,14 +554,14 @@ CRITICAL FORMATTING & CLINICAL RULES:
 
                   {/* Assistant Footer Info */}
                   {!isUser && (
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-850 text-[10px] font-mono text-slate-500">
-                      <span>{msg.model || 'Groq Llama-3.3 70B'} · {msg.latency_ms || 120}ms</span>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-[10px] font-mono text-slate-500">
+                      <span>{msg.model || 'Groq Active Model'} · {msg.latency_ms || 120}ms</span>
                       <button
                         onClick={() => handleCopy(msg.content, idx)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white flex items-center gap-1"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-slate-900 flex items-center gap-1"
                         title="Copy message"
                       >
-                        {copiedIndex === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {copiedIndex === idx ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                         <span>{copiedIndex === idx ? 'Copied' : 'Copy'}</span>
                       </button>
                     </div>
@@ -588,7 +570,7 @@ CRITICAL FORMATTING & CLINICAL RULES:
 
                 {/* User Avatar */}
                 {isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                     <User className="w-4 h-4" />
                   </div>
                 )}
@@ -599,13 +581,13 @@ CRITICAL FORMATTING & CLINICAL RULES:
           {/* Loading Indicator */}
           {loading && (
             <div className="flex gap-3.5 justify-start">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 animate-pulse">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0 animate-pulse">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 rounded-tl-none flex items-center gap-2 text-xs text-slate-400 font-mono">
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" />
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.2s]" />
-                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.4s]" />
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 rounded-tl-none flex items-center gap-2 text-xs text-slate-600 font-mono shadow-2xs">
+                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" />
+                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:0.2s]" />
+                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:0.4s]" />
                 <span className="ml-1">Analyzing {companyClinicalContext.companyName} clinical data...</span>
               </div>
             </div>
@@ -615,7 +597,7 @@ CRITICAL FORMATTING & CLINICAL RULES:
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800">
+        <div className="p-4 bg-white border-t border-slate-200">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -626,7 +608,7 @@ CRITICAL FORMATTING & CLINICAL RULES:
             <button
               type="button"
               onClick={handleClearChat}
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white border border-slate-800 transition-all shrink-0"
+              className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 transition-all shrink-0"
               title="Reset Chat Session"
             >
               <RotateCcw className="w-4 h-4" />
@@ -637,13 +619,13 @@ CRITICAL FORMATTING & CLINICAL RULES:
               placeholder={`Ask about ${companyClinicalContext.companyName}'s care gaps, members, or Star targets...`}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              className="flex-1 px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+              className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-300 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
             />
 
             <button
               type="submit"
               disabled={!inputMessage.trim() || loading}
-              className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md shrink-0"
+              className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs shrink-0"
             >
               <span>Send</span>
               <Send className="w-4 h-4" />
