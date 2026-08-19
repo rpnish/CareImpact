@@ -126,6 +126,13 @@ export default function AIAssistant() {
     };
 
     const starMetrics = computeStarRating(activeMembers, compName);
+    const totalGapsCount =
+      starMetrics.totalGaps !== undefined
+        ? starMetrics.totalGaps
+        : starMetrics.gapCount !== undefined
+        ? starMetrics.gapCount
+        : activeMembers.reduce((acc, m) => acc + (m.gapCount || 0), 0);
+
     const membersWithGapsList = activeMembers
       .filter((m) => m.hasCareGap)
       .sort((a, b) => (b.priority || 0) - (a.priority || 0));
@@ -148,9 +155,9 @@ export default function AIAssistant() {
       totalMembers: activeMembers.length,
       starRating: `${starMetrics.starPct}% (${starMetrics.weightedStarValue || starMetrics.starValue}★)`,
       compliancePct: starMetrics.starPct,
-      membersWithGaps: starMetrics.membersWithGaps,
-      gapFreeMembers: starMetrics.gapFreeMembers,
-      gapCount: starMetrics.gapCount,
+      membersWithGaps: starMetrics.membersWithGaps ?? membersWithGapsList.length,
+      gapFreeMembers: starMetrics.gapFreeMembers ?? (activeMembers.length - membersWithGapsList.length),
+      gapCount: totalGapsCount,
       targetPopulation: affiliation.targetPopulation,
       criteriaSummary: criteriaSummary || 'No specific quality measures assigned (Uninsured cohort).',
       prioritizedPatients: topPrioritizedSummary || 'No patients with open gaps found in this plan.',
@@ -487,70 +494,76 @@ CRITICAL FORMATTING & CLINICAL RULES:
                   </div>
                 )}
 
-                {/* Message Bubble with ReactMarkdown & remarkGfm */}
+                {/* Message Bubble */}
                 <div
-                  className={`max-w-3xl rounded-2xl p-4 space-y-2 text-xs leading-relaxed relative group overflow-hidden ${
+                  className={`max-w-3xl rounded-2xl p-4 text-xs leading-relaxed relative group overflow-hidden ${
                     isUser
                       ? 'bg-blue-600 text-white rounded-tr-none shadow-xs'
-                      : 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tl-none shadow-2xs'
+                      : 'bg-slate-50 text-slate-900 border border-slate-200 rounded-tl-none shadow-2xs space-y-2'
                   }`}
                 >
-                  <div className="prose prose-slate max-w-none text-xs">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        table: ({ node, ...props }) => (
-                          <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 bg-white shadow-2xs">
-                            <table className="w-full text-left text-xs border-collapse divide-y divide-slate-200" {...props} />
-                          </div>
-                        ),
-                        thead: ({ node, ...props }) => (
-                          <thead className="bg-slate-100 text-slate-700 font-mono text-[11px] uppercase tracking-wider font-bold" {...props} />
-                        ),
-                        tbody: ({ node, ...props }) => (
-                          <tbody className="divide-y divide-slate-200 font-sans" {...props} />
-                        ),
-                        tr: ({ node, ...props }) => (
-                          <tr className="hover:bg-slate-50 transition-colors" {...props} />
-                        ),
-                        th: ({ node, ...props }) => (
-                          <th className="py-2.5 px-3.5 text-slate-700 font-semibold border-b border-slate-200" {...props} />
-                        ),
-                        td: ({ node, ...props }) => (
-                          <td className="py-2.5 px-3.5 text-slate-800 text-xs leading-relaxed" {...props} />
-                        ),
-                        ul: ({ node, ...props }) => (
-                          <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-blue-600" {...props} />
-                        ),
-                        ol: ({ node, ...props }) => (
-                          <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-blue-600 font-mono" {...props} />
-                        ),
-                        li: ({ node, ...props }) => (
-                          <li className="text-slate-800 pl-1" {...props} />
-                        ),
-                        p: ({ node, ...props }) => (
-                          <p className="my-1.5 leading-relaxed text-slate-800" {...props} />
-                        ),
-                        strong: ({ node, ...props }) => (
-                          <strong className={isUser ? 'text-white font-bold' : 'text-slate-900 font-bold'} {...props} />
-                        ),
-                        h1: ({ node, ...props }) => (
-                          <h1 className="text-base font-bold text-slate-900 mt-3 mb-1.5" {...props} />
-                        ),
-                        h2: ({ node, ...props }) => (
-                          <h2 className="text-sm font-bold text-slate-900 mt-3 mb-1.5" {...props} />
-                        ),
-                        h3: ({ node, ...props }) => (
-                          <h3 className="text-xs font-bold text-blue-700 mt-2 mb-1 uppercase font-mono" {...props} />
-                        ),
-                        code: ({ node, inline, ...props }) => (
-                          <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[11px] text-blue-700 border border-slate-200" {...props} />
-                        ),
-                      }}
-                    >
+                  {isUser ? (
+                    <div className="text-white font-medium text-xs leading-relaxed whitespace-pre-wrap">
                       {msg.content}
-                    </ReactMarkdown>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="prose prose-slate max-w-none text-xs">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          table: ({ node, ...props }) => (
+                            <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                              <table className="w-full text-left text-xs border-collapse divide-y divide-slate-200" {...props} />
+                            </div>
+                          ),
+                          thead: ({ node, ...props }) => (
+                            <thead className="bg-slate-100 text-slate-700 font-mono text-[11px] uppercase tracking-wider font-bold" {...props} />
+                          ),
+                          tbody: ({ node, ...props }) => (
+                            <tbody className="divide-y divide-slate-200 font-sans" {...props} />
+                          ),
+                          tr: ({ node, ...props }) => (
+                            <tr className="hover:bg-slate-50 transition-colors" {...props} />
+                          ),
+                          th: ({ node, ...props }) => (
+                            <th className="py-2.5 px-3.5 text-slate-700 font-semibold border-b border-slate-200" {...props} />
+                          ),
+                          td: ({ node, ...props }) => (
+                            <td className="py-2.5 px-3.5 text-slate-800 text-xs leading-relaxed" {...props} />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-blue-600" {...props} />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-blue-600 font-mono" {...props} />
+                          ),
+                          li: ({ node, ...props }) => (
+                            <li className="text-slate-800 pl-1" {...props} />
+                          ),
+                          p: ({ node, ...props }) => (
+                            <p className="my-1.5 leading-relaxed text-slate-800" {...props} />
+                          ),
+                          strong: ({ node, ...props }) => (
+                            <strong className="text-slate-900 font-bold" {...props} />
+                          ),
+                          h1: ({ node, ...props }) => (
+                            <h1 className="text-base font-bold text-slate-900 mt-3 mb-1.5" {...props} />
+                          ),
+                          h2: ({ node, ...props }) => (
+                            <h2 className="text-sm font-bold text-slate-900 mt-3 mb-1.5" {...props} />
+                          ),
+                          h3: ({ node, ...props }) => (
+                            <h3 className="text-xs font-bold text-blue-700 mt-2 mb-1 uppercase font-mono" {...props} />
+                          ),
+                          code: ({ node, inline, ...props }) => (
+                            <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[11px] text-blue-700 border border-slate-200" {...props} />
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
 
                   {/* Assistant Footer Info */}
                   {!isUser && (
