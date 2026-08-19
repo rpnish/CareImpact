@@ -25,6 +25,7 @@ import {
   CLINICAL_MEASURE_CATALOG,
   computeStarRating,
 } from '../utils/metricsEngine';
+import PeekingRobot from '../components/PeekingRobot';
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 
@@ -646,6 +647,15 @@ CRITICAL FORMATTING & CLINICAL RULES:
           </form>
         </div>
       </div>
+
+      {/* Interactive Pop-up & Peeking Animated Robot Assistant */}
+      <PeekingRobot
+        companyName={companyClinicalContext.companyName}
+        onInteract={() => {
+          const inputEl = document.querySelector('input[type="text"]');
+          if (inputEl) inputEl.focus();
+        }}
+      />
     </div>
   );
 }
